@@ -255,24 +255,34 @@ class AIDevDashboard(QMainWindow):
                 pass
 
     def _trigger_manual_commit(self) -> None:
-        """Triggers the backend API to parse the diff and perform an AI commit."""
         target_path = self.txt_project_path.text()
-        self.log_viewer.append(f">>> Instructing 8B AI to analyze diffs and commit changes for '{Path(target_path).name}'...")
+        self.log_viewer.append(f">>> Instructing 8B AI to analyze diffs...")
         self.btn_manual_commit.setEnabled(False) 
         
         payload = {"project_path": target_path}
-        self.commit_worker = APIWorker(f"{self.api_url}/force-commit", method="POST", payload=payload)
-        self.commit_worker.success_signal.connect(self._on_commit_success)
-        self.commit_worker.error_signal.connect(self._on_commit_error)
-        self.commit_worker.start()
+        
+        # FIX: Store workers in a list to prevent Garbage Collection during long AI runs
+        if not hasattr(self, 'active_workers'):
+            self.active_workers = []
+            
+        worker = APIWorker(f"{self.api_url}/force-commit", method="POST", payload=payload)
+        self.active_workers.append(worker) # Hold the reference in memory
+        
+        worker.success_signal.connect(lambda data, w=worker: self._on_commit_success(data, w))
+        worker.error_signal.connect(lambda err, w=worker: self._on_commit_error(err, w))
+        worker.start()
 
-    def _on_commit_success(self, data: dict) -> None:
+    def _on_commit_success(self, data, worker):
         self.log_viewer.append(f"[SUCCESS] {data.get('message')}")
         self.btn_manual_commit.setEnabled(True)
+        if worker in self.active_workers:
+            self.active_workers.remove(worker) # Clean up memory once done
 
-    def _on_commit_error(self, error_msg: str) -> None:
+    def _on_commit_error(self, error_msg, worker):
         self.log_viewer.append(f"[ERROR] Manual commit failed: {error_msg}")
         self.btn_manual_commit.setEnabled(True)
+        if worker in self.active_workers:
+            self.active_workers.remove(worker)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

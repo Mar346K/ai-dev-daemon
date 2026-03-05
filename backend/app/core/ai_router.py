@@ -13,11 +13,12 @@ class AIRouter:
         self.heavy_model = "llama3.3:70b"
 
     def generate_commit_message(self, diff_text: str) -> str:
-        """
-        Uses the rapid 8B model to generate a standard commit message.
-        Always runs, regardless of system load.
-        """
-        prompt = f"Write a concise, professional Git commit message for this diff:\n\n{diff_text}"
+        # Professional Standard: Use a system-style instruction to limit verbosity
+        prompt = (
+            "You are a senior software engineer. Write a one-line Git commit message "
+            "summarizing the following diff. Output ONLY the message. No explanations, "
+            f"no quotes, no markdown:\n\n{diff_text}"
+        )
         return self._query_ollama(self.fast_model, prompt)
 
     def architectural_review(self, diff_text: str) -> Optional[str]:

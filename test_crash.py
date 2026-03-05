@@ -11,3 +11,5 @@ print("Exception: Texture failed to load at 0x00A1")
 
 time.sleep(1)
 print("INFO: Engine shutting down.")
+
+# Final architecture test

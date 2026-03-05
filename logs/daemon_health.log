@@ -11,3 +11,11 @@
 2026-03-05 11:04:30,990 - INFO - [main.py:62] - Received request to force commit for: C:\AI\ai_dev_daemon
 2026-03-05 11:05:03,750 - INFO - [main.py:71] - Commit generated: Error querying llama3.1:latest: timed out
 2026-03-05 11:10:18,248 - INFO - [main.py:62] - Received request to force commit for: C:\AI\ai_dev_daemon
+2026-03-05 11:10:44,170 - INFO - [main.py:71] - Commit generated: Here is a concise and professional Git commit message for the diff:
+
+`Decouple PySide6 rendering from GPU to prevent crashes`
+
+This message briefly explains the purpose of the changes, making it easy for others to understand what was changed and why.
+2026-03-05 11:15:01,695 - INFO - [main.py:14] - AI Dev Daemon shutting down safely.
+2026-03-05 11:15:12,536 - INFO - [main.py:12] - AI Dev Daemon initialized and listening for connections.
+2026-03-05 11:15:34,735 - INFO - [main.py:62] - Received request to force commit for: C:\AI\ai_dev_daemon

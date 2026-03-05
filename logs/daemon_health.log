@@ -7,3 +7,5 @@
 2026-03-05 11:00:37,683 - INFO - [main.py:13] - AI Dev Daemon shutting down safely.
 2026-03-05 11:01:23,982 - INFO - [main.py:12] - AI Dev Daemon initialized and listening for connections.
 2026-03-05 11:02:01,260 - INFO - [main.py:62] - Received request to force commit for: C:\AI\ai_dev_daemon
+2026-03-05 11:02:34,019 - INFO - [main.py:71] - Commit generated: Error querying llama3.1:latest: timed out
+2026-03-05 11:04:30,990 - INFO - [main.py:62] - Received request to force commit for: C:\AI\ai_dev_daemon

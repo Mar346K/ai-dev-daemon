@@ -3,40 +3,40 @@ import subprocess
 import re
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 import httpx
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QTextBrowser, QFrame
+    QLabel, QPushButton, QTextBrowser, QFrame, QFileDialog, QLineEdit
 )
 from PySide6.QtCore import QTimer, Qt, QThread, Signal
 
 class APIWorker(QThread):
-    """Background worker thread to handle HTTP requests."""
     success_signal = Signal(dict)
     error_signal = Signal(str)
 
-    def __init__(self, url: str, method: str = "GET"):
+    def __init__(self, url: str, method: str = "GET", payload: dict | None = None):
         super().__init__()
         self.url = url
         self.method = method
+        self.payload = payload or {}
 
     def run(self) -> None:
         try:
-            with httpx.Client(timeout=10.0) as client:
+            with httpx.Client(timeout=45.0) as client: # Increased timeout to wait for AI generation
                 if self.method == "GET":
                     response = client.get(self.url)
                 elif self.method == "POST":
-                    response = client.post(self.url)
+                    response = client.post(self.url, json=self.payload)
                 response.raise_for_status()
                 self.success_signal.emit(response.json())
+        except httpx.HTTPStatusError as exc:
+            err_detail = exc.response.json().get("detail", str(exc))
+            self.error_signal.emit(f"API Error: {err_detail}")
         except Exception as e:
             self.error_signal.emit(str(e))
 
 class ProjectRunnerWorker(QThread):
-    """
-    Executes a target python script as a subprocess. Pipes stdout/stderr,
-    filters out noise via Regex, and deduplicates rapid-fire identical errors.
-    """
     log_signal = Signal(str)
     
     def __init__(self, target_script: str):
@@ -44,23 +44,18 @@ class ProjectRunnerWorker(QThread):
         self.target_script = target_script
         self.is_running = True
         self.error_pattern = re.compile(r"(?i)(traceback|exception|error)")
-        
         self.last_error_msg = ""
         self.last_error_time = 0.0
 
     def run(self) -> None:
-        from pathlib import Path
         import sys
-        
         try:
-            # Professional Standard: Absolute Path Resolution & Verification
             script_path = Path(self.target_script).resolve()
             
             if not script_path.exists():
                 self.log_signal.emit(f"⚠️ [CRITICAL] Execution Aborted: File not found at {script_path}")
                 return
 
-            # Professional Standard: Use sys.executable to lock the environment, and cwd to lock the directory
             process = subprocess.Popen(
                 [sys.executable, "-u", str(script_path)],
                 stdout=subprocess.PIPE,
@@ -83,10 +78,8 @@ class ProjectRunnerWorker(QThread):
                     
                 if self.error_pattern.search(line):
                     current_time = time.time()
-                    
                     if line == self.last_error_msg and (current_time - self.last_error_time) < 2.0:
                         continue
-                        
                     self.last_error_msg = line
                     self.last_error_time = current_time
                     self.log_signal.emit(f"⚠️ [CRITICAL] {line}")
@@ -124,10 +117,30 @@ class AIDevDashboard(QMainWindow):
         top_bar.addWidget(self.lbl_timer)
         main_layout.addLayout(top_bar)
 
-        line = QFrame()
-        line.setFrameShape(QFrame.Shape.HLine)
-        line.setFrameShadow(QFrame.Shadow.Sunken)
-        main_layout.addWidget(line)
+        line1 = QFrame()
+        line1.setFrameShape(QFrame.Shape.HLine)
+        line1.setFrameShadow(QFrame.Shadow.Sunken)
+        main_layout.addWidget(line1)
+
+        project_bar = QHBoxLayout()
+        self.lbl_project = QLabel("Target Project:")
+        self.lbl_project.setStyleSheet("font-weight: bold;")
+        
+        self.txt_project_path = QLineEdit(str(Path("..").resolve())) 
+        self.txt_project_path.setReadOnly(True)
+        self.txt_project_path.setStyleSheet("background-color: #2d2d2d; color: #d4d4d4;")
+        
+        self.btn_browse = QPushButton("Browse...")
+        
+        project_bar.addWidget(self.lbl_project)
+        project_bar.addWidget(self.txt_project_path)
+        project_bar.addWidget(self.btn_browse)
+        main_layout.addLayout(project_bar)
+
+        line2 = QFrame()
+        line2.setFrameShape(QFrame.Shape.HLine)
+        line2.setFrameShadow(QFrame.Shadow.Sunken)
+        main_layout.addWidget(line2)
 
         self.log_viewer = QTextBrowser()
         self.log_viewer.setStyleSheet("background-color: #1e1e1e; color: #d4d4d4; font-family: monospace;")
@@ -145,8 +158,17 @@ class AIDevDashboard(QMainWindow):
             
         main_layout.addLayout(bottom_bar)
         
+        self.btn_browse.clicked.connect(self._browse_project_directory)
         self.btn_compile_context.clicked.connect(self._trigger_context_compile)
         self.btn_run_project.clicked.connect(self._trigger_project_runner)
+        self.btn_manual_commit.clicked.connect(self._trigger_manual_commit)
+
+    def _browse_project_directory(self) -> None:
+        folder = QFileDialog.getExistingDirectory(self, "Select Target Project Directory")
+        if folder:
+            abs_folder = str(Path(folder).resolve())
+            self.txt_project_path.setText(abs_folder)
+            self.log_viewer.append(f">>> Target project updated to: {abs_folder}")
 
     def _init_timers(self) -> None:
         self.clock_timer = QTimer(self)
@@ -179,10 +201,12 @@ class AIDevDashboard(QMainWindow):
         self.lbl_status.setText("Backend Status: 🔴 OFFLINE")
 
     def _trigger_context_compile(self) -> None:
-        self.log_viewer.append(">>> Compiling repository context... Please wait.")
+        target_path = self.txt_project_path.text()
+        self.log_viewer.append(f">>> Compiling repository context for '{Path(target_path).name}'... Please wait.")
         self.btn_compile_context.setEnabled(False) 
         
-        self.compile_worker = APIWorker(f"{self.api_url}/compile-context", method="POST")
+        payload = {"project_path": target_path}
+        self.compile_worker = APIWorker(f"{self.api_url}/compile-context", method="POST", payload=payload)
         self.compile_worker.success_signal.connect(self._on_compile_success)
         self.compile_worker.error_signal.connect(self._on_compile_error)
         self.compile_worker.start()
@@ -196,17 +220,52 @@ class AIDevDashboard(QMainWindow):
         self.btn_compile_context.setEnabled(True)
 
     def _trigger_project_runner(self) -> None:
-        """Launches the smart telemetry subprocess."""
-        self.log_viewer.append(">>> Initializing project runner with Smart Telemetry...")
+        target_dir = self.txt_project_path.text()
         
-        # We target a dummy script in the root folder for testing
-        self.project_worker = ProjectRunnerWorker("../test_crash.py")
+        script_file, _ = QFileDialog.getOpenFileName(
+            self, "Select Python Entry Script", target_dir, "Python Files (*.py)"
+        )
+        
+        if not script_file:
+            return 
+            
+        script_path = Path(script_file)
+        self.log_viewer.append(f">>> Initializing project runner for '{script_path.name}'...")
+        
+        self.project_worker = ProjectRunnerWorker(str(script_path))
         self.project_worker.log_signal.connect(self._on_project_log)
         self.project_worker.start()
 
     def _on_project_log(self, log_entry: str) -> None:
-        """Appends intercepted subprocess logs to the UI."""
         self.log_viewer.append(log_entry)
+        
+        if "⚠️ [CRITICAL]" in log_entry:
+            project_name = Path(self.txt_project_path.text()).name
+            payload = {"project_name": project_name, "log_message": log_entry}
+            try:
+                httpx.post(f"{self.api_url}/log-crash", json=payload, timeout=3.0)
+            except Exception:
+                pass
+
+    def _trigger_manual_commit(self) -> None:
+        """Triggers the backend API to parse the diff and perform an AI commit."""
+        target_path = self.txt_project_path.text()
+        self.log_viewer.append(f">>> Instructing 8B AI to analyze diffs and commit changes for '{Path(target_path).name}'...")
+        self.btn_manual_commit.setEnabled(False) 
+        
+        payload = {"project_path": target_path}
+        self.commit_worker = APIWorker(f"{self.api_url}/force-commit", method="POST", payload=payload)
+        self.commit_worker.success_signal.connect(self._on_commit_success)
+        self.commit_worker.error_signal.connect(self._on_commit_error)
+        self.commit_worker.start()
+
+    def _on_commit_success(self, data: dict) -> None:
+        self.log_viewer.append(f"[SUCCESS] {data.get('message')}")
+        self.btn_manual_commit.setEnabled(True)
+
+    def _on_commit_error(self, error_msg: str) -> None:
+        self.log_viewer.append(f"[ERROR] Manual commit failed: {error_msg}")
+        self.btn_manual_commit.setEnabled(True)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

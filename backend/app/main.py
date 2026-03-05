@@ -1,36 +1,84 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, status, HTTPException
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+from pathlib import Path
 from app.core.context_builder import ContextCompiler
-from app.core.telemetry import daemon_logger
+from app.core.telemetry import daemon_logger, get_project_logger
+from app.core.git_manager import GitManager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    daemon_logger.info("AI Dev Daemon initialized and listening for connections.")
+    yield
+    daemon_logger.info("AI Dev Daemon shutting down safely.")
 
 app = FastAPI(
     title="AI Dev Daemon API",
     description="Backend for the local AI Developer Dashboard and Version Control Daemon.",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
-@app.on_event("startup")
-async def startup_event() -> None:
-    """Logs the ignition of the backend daemon."""
-    daemon_logger.info("AI Dev Daemon initialized and listening for connections.")
+class ProjectRequest(BaseModel):
+    project_path: str
+
+class CrashLogRequest(BaseModel):
+    project_name: str
+    log_message: str
 
 @app.get("/health", status_code=status.HTTP_200_OK)
 async def health_check() -> JSONResponse:
-    """Health check endpoint."""
     return JSONResponse(content={"status": "healthy", "service": "ai_dev_daemon"})
 
 @app.post("/compile-context", status_code=status.HTTP_200_OK)
-async def compile_context() -> JSONResponse:
-    """Triggers the context builder and logs the event."""
-    daemon_logger.info("Received request to compile context payload.")
+async def compile_context(request: ProjectRequest) -> JSONResponse:
+    target_dir = Path(request.project_path).resolve()
+    daemon_logger.info(f"Received request to compile context for: {target_dir}")
+    
+    if not target_dir.exists() or not target_dir.is_dir():
+        daemon_logger.warning(f"Rejected invalid directory path: {target_dir}")
+        raise HTTPException(status_code=400, detail="Invalid project directory path.")
+
     try:
-        compiler = ContextCompiler()
+        compiler = ContextCompiler(root_path=str(target_dir))
         output_path = compiler.compile()
         daemon_logger.info(f"Context compiled successfully: {output_path.name}")
+        
         return JSONResponse(content={
             "status": "success", 
-            "message": f"Context compiled successfully to {output_path.name}"
+            "message": f"Context compiled successfully to {output_path}"
         })
     except Exception as e:
         daemon_logger.error(f"Context compilation failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/force-commit", status_code=status.HTTP_200_OK)
+async def force_commit(request: ProjectRequest) -> JSONResponse:
+    """
+    Triggers the AI to immediately read the diff, generate a message, and commit the target repo.
+    """
+    target_dir = Path(request.project_path).resolve()
+    daemon_logger.info(f"Received request to force commit for: {target_dir}")
+    
+    if not target_dir.exists() or not target_dir.is_dir():
+        raise HTTPException(status_code=400, detail="Invalid project directory path.")
+
+    try:
+        git_mgr = GitManager(repo_path=str(target_dir))
+        commit_msg = git_mgr.force_ai_commit()
+        
+        daemon_logger.info(f"Commit generated: {commit_msg}")
+        return JSONResponse(content={
+            "status": "success", 
+            "message": f"Committed successfully:\n{commit_msg}"
+        })
+    except Exception as e:
+        daemon_logger.error(f"Commit failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/log-crash", status_code=status.HTTP_200_OK)
+async def log_crash(request: CrashLogRequest) -> JSONResponse:
+    project_logger = get_project_logger(request.project_name)
+    project_logger.error(request.log_message)
+    return JSONResponse(content={"status": "logged"})

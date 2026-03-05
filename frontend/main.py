@@ -268,29 +268,36 @@ class AIDevDashboard(QMainWindow):
                 pass
 
     def _trigger_manual_commit(self) -> None:
-        """Triggers the backend API with hardware-aware worker retention."""
+        """Triggers the backend API with the Absolute Parent Anchor."""
         target_path = self.txt_project_path.text()
         self.log_viewer.append(f">>> Analyzing diffs with 8B Model... (Hardware spooling detected)")
         self.btn_manual_commit.setEnabled(False) 
         
         payload = {"project_path": target_path}
         
+        # NUCLEAR FIX: Pass 'self' as the parent. 
+        # This anchors the thread to the C++ memory of the window itself.
         worker = APIWorker(f"{self.api_url}/force-commit", method="POST", payload=payload)
+        worker.setParent(self) 
+        
         self.active_workers.append(worker) 
         
-        # Connect to explicit methods for better memory management
         worker.success_signal.connect(self._on_commit_success)
         worker.error_signal.connect(self._on_commit_error)
         
-        # Ensure the thread is marked for cleanup after execution
+        # Ensures the object is cleaned up by the UI when the thread finally finishes
         worker.finished.connect(worker.deleteLater)
+        
         worker.start()
 
     def _on_commit_success(self, data: dict) -> None:
+        # We add a check to ensure the UI hasn't been closed during the 60s wait
+        if not self.isVisible():
+            return
         self.log_viewer.append(f"[SUCCESS] {data.get('message')}")
         self.btn_manual_commit.setEnabled(True)
         self._cleanup_workers()
-
+        
     def _on_commit_error(self, error_msg: str) -> None:
         self.log_viewer.append(f"[ERROR] Manual commit failed: {error_msg}")
         self.btn_manual_commit.setEnabled(True)

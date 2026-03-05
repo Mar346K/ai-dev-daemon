@@ -38,7 +38,7 @@ class AIRouter:
         
         return review
 
-    def _query_ollama(self, model: str, prompt: str, timeout: float = 30.0) -> str:
+    def _query_ollama(self, model: str, prompt: str, timeout: float = 90.0) -> str:
         """Internal helper to execute Ollama API calls."""
         with httpx.Client(timeout=timeout) as client:
             payload = {

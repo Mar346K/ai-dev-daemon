@@ -30,7 +30,8 @@ class APIWorker(QThread):
 
     def run(self) -> None:
         try:
-            with httpx.Client(timeout=45.0) as client: # Increased timeout to wait for AI generation
+            # Increased to 90 seconds to handle GPU cold starts and heavy 8B model loading
+            with httpx.Client(timeout=90.0) as client: # Increased timeout to wait for AI generation
                 if self.method == "GET":
                     response = client.get(self.url)
                 elif self.method == "POST":

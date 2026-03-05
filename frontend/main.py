@@ -105,6 +105,9 @@ class AIDevDashboard(QMainWindow):
         
         self.session_start_time = datetime.now(timezone.utc)
         self.api_url = "http://localhost:8000"
+        
+        # Professional Standard: Class-level storage to anchor workers in memory
+        self.active_workers = []
 
         self._init_ui()
         self._init_timers()
@@ -114,6 +117,7 @@ class AIDevDashboard(QMainWindow):
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
 
+        # Top Bar: Health and Uptime
         top_bar = QHBoxLayout()
         self.lbl_status = QLabel("Backend Status: 🔴 OFFLINE")
         self.lbl_status.setStyleSheet("font-weight: bold; font-size: 14px;")
@@ -130,6 +134,7 @@ class AIDevDashboard(QMainWindow):
         line1.setFrameShadow(QFrame.Shadow.Sunken)
         main_layout.addWidget(line1)
 
+        # Dynamic Project Selector
         project_bar = QHBoxLayout()
         self.lbl_project = QLabel("Target Project:")
         self.lbl_project.setStyleSheet("font-weight: bold;")
@@ -150,11 +155,13 @@ class AIDevDashboard(QMainWindow):
         line2.setFrameShadow(QFrame.Shadow.Sunken)
         main_layout.addWidget(line2)
 
+        # Logs Viewer
         self.log_viewer = QTextBrowser()
         self.log_viewer.setStyleSheet("background-color: #1e1e1e; color: #d4d4d4; font-family: monospace;")
         self.log_viewer.append(">>> UI Initialized. Awaiting backend connection...")
         main_layout.addWidget(self.log_viewer)
 
+        # Action Buttons
         bottom_bar = QHBoxLayout()
         self.btn_compile_context = QPushButton("Compile Context (Markdown)")
         self.btn_run_project = QPushButton("Run Active Project (Track Logs)")
@@ -166,6 +173,7 @@ class AIDevDashboard(QMainWindow):
             
         main_layout.addLayout(bottom_bar)
         
+        # UI Event Wiring
         self.btn_browse.clicked.connect(self._browse_project_directory)
         self.btn_compile_context.clicked.connect(self._trigger_context_compile)
         self.btn_run_project.clicked.connect(self._trigger_project_runner)
@@ -214,22 +222,26 @@ class AIDevDashboard(QMainWindow):
         self.btn_compile_context.setEnabled(False) 
         
         payload = {"project_path": target_path}
-        self.compile_worker = APIWorker(f"{self.api_url}/compile-context", method="POST", payload=payload)
-        self.compile_worker.success_signal.connect(self._on_compile_success)
-        self.compile_worker.error_signal.connect(self._on_compile_error)
-        self.compile_worker.start()
+        worker = APIWorker(f"{self.api_url}/compile-context", method="POST", payload=payload)
+        self.active_workers.append(worker)
+        
+        worker.success_signal.connect(self._on_compile_success)
+        worker.error_signal.connect(self._on_compile_error)
+        worker.finished.connect(worker.deleteLater)
+        worker.start()
 
     def _on_compile_success(self, data: dict) -> None:
         self.log_viewer.append(f"[SUCCESS] {data.get('message')}")
         self.btn_compile_context.setEnabled(True)
+        self._cleanup_workers()
 
     def _on_compile_error(self, error_msg: str) -> None:
         self.log_viewer.append(f"[ERROR] Context compilation failed: {error_msg}")
         self.btn_compile_context.setEnabled(True)
+        self._cleanup_workers()
 
     def _trigger_project_runner(self) -> None:
         target_dir = self.txt_project_path.text()
-        
         script_file, _ = QFileDialog.getOpenFileName(
             self, "Select Python Entry Script", target_dir, "Python Files (*.py)"
         )
@@ -256,34 +268,37 @@ class AIDevDashboard(QMainWindow):
                 pass
 
     def _trigger_manual_commit(self) -> None:
+        """Triggers the backend API with hardware-aware worker retention."""
         target_path = self.txt_project_path.text()
-        self.log_viewer.append(f">>> Instructing 8B AI to analyze diffs...")
+        self.log_viewer.append(f">>> Analyzing diffs with 8B Model... (Hardware spooling detected)")
         self.btn_manual_commit.setEnabled(False) 
         
         payload = {"project_path": target_path}
         
-        # FIX: Store workers in a list to prevent Garbage Collection during long AI runs
-        if not hasattr(self, 'active_workers'):
-            self.active_workers = []
-            
         worker = APIWorker(f"{self.api_url}/force-commit", method="POST", payload=payload)
-        self.active_workers.append(worker) # Hold the reference in memory
+        self.active_workers.append(worker) 
         
-        worker.success_signal.connect(lambda data, w=worker: self._on_commit_success(data, w))
-        worker.error_signal.connect(lambda err, w=worker: self._on_commit_error(err, w))
+        # Connect to explicit methods for better memory management
+        worker.success_signal.connect(self._on_commit_success)
+        worker.error_signal.connect(self._on_commit_error)
+        
+        # Ensure the thread is marked for cleanup after execution
+        worker.finished.connect(worker.deleteLater)
         worker.start()
 
-    def _on_commit_success(self, data, worker):
+    def _on_commit_success(self, data: dict) -> None:
         self.log_viewer.append(f"[SUCCESS] {data.get('message')}")
         self.btn_manual_commit.setEnabled(True)
-        if worker in self.active_workers:
-            self.active_workers.remove(worker) # Clean up memory once done
+        self._cleanup_workers()
 
-    def _on_commit_error(self, error_msg, worker):
+    def _on_commit_error(self, error_msg: str) -> None:
         self.log_viewer.append(f"[ERROR] Manual commit failed: {error_msg}")
         self.btn_manual_commit.setEnabled(True)
-        if worker in self.active_workers:
-            self.active_workers.remove(worker)
+        self._cleanup_workers()
+
+    def _cleanup_workers(self) -> None:
+        """Professional Standard: Clean up the tracking list without mutating during iteration."""
+        self.active_workers = [w for w in self.active_workers if w.isRunning()]
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

@@ -31,7 +31,7 @@ class APIWorker(QThread):
     def run(self) -> None:
         try:
             # Increased to 90 seconds to handle GPU cold starts and heavy 8B model loading
-            with httpx.Client(timeout=90.0) as client: # Increased timeout to wait for AI generation
+            with httpx.Client(timeout=90.0) as client: 
                 if self.method == "GET":
                     response = client.get(self.url)
                 elif self.method == "POST":
@@ -43,6 +43,7 @@ class APIWorker(QThread):
             self.error_signal.emit(f"API Error: {err_detail}")
         except Exception as e:
             self.error_signal.emit(str(e))
+
 
 class ProjectRunnerWorker(QThread):
     log_signal = Signal(str)
@@ -97,6 +98,7 @@ class ProjectRunnerWorker(QThread):
         except Exception as e:
              self.log_signal.emit(f"⚠️ [CRITICAL] Subprocess failed: {e}")
 
+
 class AIDevDashboard(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -106,8 +108,11 @@ class AIDevDashboard(QMainWindow):
         self.session_start_time = datetime.now(timezone.utc)
         self.api_url = "http://localhost:8000"
         
-        # Professional Standard: Class-level storage to anchor workers in memory
-        self.active_workers = []
+        # Professional Standard: Permanent resident workers to prevent Garbage Collection
+        self.commit_worker = None
+        self.compile_worker = None
+        self.project_worker = None
+        self.health_worker = None
 
         self._init_ui()
         self._init_timers()
@@ -205,6 +210,7 @@ class AIDevDashboard(QMainWindow):
 
     def _ping_backend(self) -> None:
         self.health_worker = APIWorker(f"{self.api_url}/health")
+        self.health_worker.setParent(self)
         self.health_worker.success_signal.connect(self._on_health_success)
         self.health_worker.error_signal.connect(self._on_health_error)
         self.health_worker.start()
@@ -217,30 +223,34 @@ class AIDevDashboard(QMainWindow):
         self.lbl_status.setText("Backend Status: 🔴 OFFLINE")
 
     def _trigger_context_compile(self) -> None:
+        if self.compile_worker and self.compile_worker.isRunning():
+            self.log_viewer.append("⚠️ [BUSY] Context compiler is already running.")
+            return
+
         target_path = self.txt_project_path.text()
         self.log_viewer.append(f">>> Compiling repository context for '{Path(target_path).name}'... Please wait.")
         self.btn_compile_context.setEnabled(False) 
         
         payload = {"project_path": target_path}
-        worker = APIWorker(f"{self.api_url}/compile-context", method="POST", payload=payload)
-        self.active_workers.append(worker)
-        
-        worker.success_signal.connect(self._on_compile_success)
-        worker.error_signal.connect(self._on_compile_error)
-        worker.finished.connect(worker.deleteLater)
-        worker.start()
+        self.compile_worker = APIWorker(f"{self.api_url}/compile-context", method="POST", payload=payload)
+        self.compile_worker.setParent(self)
+        self.compile_worker.success_signal.connect(self._on_compile_success)
+        self.compile_worker.error_signal.connect(self._on_compile_error)
+        self.compile_worker.start()
 
     def _on_compile_success(self, data: dict) -> None:
         self.log_viewer.append(f"[SUCCESS] {data.get('message')}")
         self.btn_compile_context.setEnabled(True)
-        self._cleanup_workers()
 
     def _on_compile_error(self, error_msg: str) -> None:
         self.log_viewer.append(f"[ERROR] Context compilation failed: {error_msg}")
         self.btn_compile_context.setEnabled(True)
-        self._cleanup_workers()
 
     def _trigger_project_runner(self) -> None:
+        if self.project_worker and self.project_worker.isRunning():
+            self.log_viewer.append("⚠️ [BUSY] A project is already running. Please close it first.")
+            return
+
         target_dir = self.txt_project_path.text()
         script_file, _ = QFileDialog.getOpenFileName(
             self, "Select Python Entry Script", target_dir, "Python Files (*.py)"
@@ -253,6 +263,7 @@ class AIDevDashboard(QMainWindow):
         self.log_viewer.append(f">>> Initializing project runner for '{script_path.name}'...")
         
         self.project_worker = ProjectRunnerWorker(str(script_path))
+        self.project_worker.setParent(self)
         self.project_worker.log_signal.connect(self._on_project_log)
         self.project_worker.start()
 
@@ -268,44 +279,32 @@ class AIDevDashboard(QMainWindow):
                 pass
 
     def _trigger_manual_commit(self) -> None:
-        """Triggers the backend API with the Absolute Parent Anchor."""
+        """Triggers the backend API with the Persistent Resident Anchor."""
+        if self.commit_worker and self.commit_worker.isRunning():
+            self.log_viewer.append("⚠️ [BUSY] AI is already processing a commit. Please wait.")
+            return
+
         target_path = self.txt_project_path.text()
         self.log_viewer.append(f">>> Analyzing diffs with 8B Model... (Hardware spooling detected)")
         self.btn_manual_commit.setEnabled(False) 
         
         payload = {"project_path": target_path}
         
-        # NUCLEAR FIX: Pass 'self' as the parent. 
-        # This anchors the thread to the C++ memory of the window itself.
-        worker = APIWorker(f"{self.api_url}/force-commit", method="POST", payload=payload)
-        worker.setParent(self) 
+        self.commit_worker = APIWorker(f"{self.api_url}/force-commit", method="POST", payload=payload)
+        self.commit_worker.setParent(self) 
         
-        self.active_workers.append(worker) 
-        
-        worker.success_signal.connect(self._on_commit_success)
-        worker.error_signal.connect(self._on_commit_error)
-        
-        # Ensures the object is cleaned up by the UI when the thread finally finishes
-        worker.finished.connect(worker.deleteLater)
-        
-        worker.start()
+        self.commit_worker.success_signal.connect(self._on_commit_success)
+        self.commit_worker.error_signal.connect(self._on_commit_error)
+        self.commit_worker.start()
 
     def _on_commit_success(self, data: dict) -> None:
-        # We add a check to ensure the UI hasn't been closed during the 60s wait
-        if not self.isVisible():
-            return
         self.log_viewer.append(f"[SUCCESS] {data.get('message')}")
         self.btn_manual_commit.setEnabled(True)
-        self._cleanup_workers()
         
     def _on_commit_error(self, error_msg: str) -> None:
         self.log_viewer.append(f"[ERROR] Manual commit failed: {error_msg}")
         self.btn_manual_commit.setEnabled(True)
-        self._cleanup_workers()
 
-    def _cleanup_workers(self) -> None:
-        """Professional Standard: Clean up the tracking list without mutating during iteration."""
-        self.active_workers = [w for w in self.active_workers if w.isRunning()]
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

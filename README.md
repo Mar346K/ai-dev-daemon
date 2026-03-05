@@ -33,3 +33,36 @@ This system is built with an API-first client-server architecture, strictly sepa
    ```bash
    git clone [https://github.com/Mar346k/ai-dev-daemon.git](https://github.com/Mar346k/ai-dev-daemon.git)
    cd ai-dev-daemon
+   ```
+   
+2. Set up the environment:
+   ```bash
+   python -m venv .venv
+   source .venv/Scripts/activate  # Windows
+   ```
+3. Install dependencies:
+   ```bash
+   pip install -r backend/requirements.txt
+   pip install -r frontend/requirements.txt
+   ```
+
+Execution
+The system requires both the backend API and the frontend UI to be running simultaneously.
+
+1. Start the AI Backend:
+   Open a terminal, activate your environment, and run:
+
+   ```Bash
+   cd backend
+   uvicorn app.main:app --host 127.0.0.1 --port 8000
+   ```
+2. Launch the Control Center:
+   Open a second terminal, activate your environment, and run:
+
+   ```Bash
+   cd frontend
+   python main.py
+   ```
+   
+🔒 Security Note
+This system performs automated pre-staging DevSecOps checks. It actively scans diffs using regex patterns to redact potential API keys and secrets before they are ever processed by the AI or committed to local history.

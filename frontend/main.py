@@ -1,4 +1,11 @@
 import sys
+import os
+
+# Professional Standard: Decouple PySide6 rendering from the GPU.
+# This makes the UI immune to driver resets when Ollama spikes the VRAM.
+os.environ["QT_OPENGL"] = "software"
+os.environ["QT_QUICK_BACKEND"] = "software"
+
 import subprocess
 import re
 import time

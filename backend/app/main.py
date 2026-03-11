@@ -6,6 +6,7 @@ from pathlib import Path
 from app.core.context_builder import ContextCompiler
 from app.core.telemetry import daemon_logger, get_project_logger
 from app.core.git_manager import GitManager
+from app.core.security import secure_resolve_path
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -31,10 +32,14 @@ class CrashLogRequest(BaseModel):
 async def health_check() -> JSONResponse:
     return JSONResponse(content={"status": "healthy", "service": "ai_dev_daemon"})
 
+# ... [Inside compile_context] ...
 @app.post("/compile-context", status_code=status.HTTP_200_OK)
 async def compile_context(request: ProjectRequest) -> JSONResponse:
-    target_dir = Path(request.project_path).resolve()
+    # REPLACE: target_dir = Path(request.project_path).resolve()
+    target_dir = secure_resolve_path(request.project_path)
+    
     daemon_logger.info(f"Received request to compile context for: {target_dir}")
+    # ... rest of the function
     
     if not target_dir.exists() or not target_dir.is_dir():
         daemon_logger.warning(f"Rejected invalid directory path: {target_dir}")
@@ -53,13 +58,15 @@ async def compile_context(request: ProjectRequest) -> JSONResponse:
         daemon_logger.error(f"Context compilation failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# ... [Inside force_commit] ...
 @app.post("/force-commit", status_code=status.HTTP_200_OK)
 async def force_commit(request: ProjectRequest) -> JSONResponse:
-    """
-    Triggers the AI to immediately read the diff, generate a message, and commit the target repo.
-    """
-    target_dir = Path(request.project_path).resolve()
+    # REPLACE: target_dir = Path(request.project_path).resolve()
+    target_dir = secure_resolve_path(request.project_path)
+    
     daemon_logger.info(f"Received request to force commit for: {target_dir}")
+    # ... rest of the function
     
     if not target_dir.exists() or not target_dir.is_dir():
         raise HTTPException(status_code=400, detail="Invalid project directory path.")

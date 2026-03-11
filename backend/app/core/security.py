@@ -1,8 +1,29 @@
 import os
 import re
 from pathlib import Path
+from fastapi import HTTPException
 
-# Professional Standard: Compile Regex patterns for performance
+# Enforce a strict root directory for all AI operations. 
+# Defaults to the user's home directory unless explicitly overridden.
+WORKSPACE_ROOT = Path(os.getenv("DAEMON_WORKSPACE", Path.home())).resolve()
+
+def secure_resolve_path(requested_path: str) -> Path:
+    """
+    Resolves a requested path and ensures it does not escape the WORKSPACE_ROOT.
+    Fails fast with a 403 if traversal is detected.
+    """
+    target = Path(requested_path).resolve()
+    
+    # Python 3.9+ native method for strict path containment
+    if not target.is_relative_to(WORKSPACE_ROOT):
+        raise HTTPException(
+            status_code=403, 
+            detail=f"Path traversal blocked. Target must be within {WORKSPACE_ROOT}"
+        )
+    return target
+
+# ... (rest of your existing security.py code remains unchanged)
+
 # This detects generic API keys and OpenAI specifically.
 SECRET_PATTERNS = [
     (r"sk-[a-zA-Z0-9]{32,}", "OPENAI_API_KEY"),

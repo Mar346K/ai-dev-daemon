@@ -49,3 +49,13 @@ def scan_file_for_secrets(file_path: Path) -> None:
     except UnicodeDecodeError:
         # Silently skip binary files or non-utf8 assets like images/fonts
         pass
+
+def fence_prompt_data(data: str, tag_name: str) -> str:
+    """
+    Wraps untrusted data in XML tags for safe LLM consumption.
+    Neutralizes any matching closing tags inside the data to prevent prompt injection escapes.
+    """
+    # Neutralize malicious closing tags by escaping the slash so the LLM ignores it
+    escaped_data = data.replace(f"</{tag_name}>", f"<\\/{tag_name}>")
+    
+    return f"<{tag_name}>\n{escaped_data}\n</{tag_name}>"

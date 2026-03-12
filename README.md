@@ -1,5 +1,8 @@
 # AI Dev Daemon - Control Center
 
+[![CI Pipeline](https://github.com/Mar346K/ai-dev-daemon/actions/workflows/ci.yml/badge.svg)](https://github.com/Mar346K/ai-dev-daemon/actions)
+
+
 An enterprise-grade, local DevSecOps daemon designed to actively monitor Python processes, intercept system crashes, and utilize a local LLM to generate real-time root-cause analysis and actionable hotfixes—all within a completely air-gapped, offline environment.
 
 ## 🏗️ Architecture Overview

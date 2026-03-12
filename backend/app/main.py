@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, status, HTTPException
+from fastapi import FastAPI, status, HTTPException, Request # <-- Added Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from pathlib import Path
@@ -21,6 +21,17 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# === ADD THIS GLOBAL EXCEPTION HANDLER ===
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Catches all unhandled exceptions, logs them securely, and masks the output to the client."""
+    daemon_logger.error(f"Unhandled exception on {request.url}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": "Internal server error. Please check the daemon logs."},
+    )
+# ==========================================
+
 class ProjectRequest(BaseModel):
     project_path: str
 
@@ -32,57 +43,42 @@ class CrashLogRequest(BaseModel):
 async def health_check() -> JSONResponse:
     return JSONResponse(content={"status": "healthy", "service": "ai_dev_daemon"})
 
-# ... [Inside compile_context] ...
 @app.post("/compile-context", status_code=status.HTTP_200_OK)
 async def compile_context(request: ProjectRequest) -> JSONResponse:
-    # REPLACE: target_dir = Path(request.project_path).resolve()
     target_dir = secure_resolve_path(request.project_path)
-    
     daemon_logger.info(f"Received request to compile context for: {target_dir}")
-    # ... rest of the function
     
     if not target_dir.exists() or not target_dir.is_dir():
         daemon_logger.warning(f"Rejected invalid directory path: {target_dir}")
         raise HTTPException(status_code=400, detail="Invalid project directory path.")
 
-    try:
-        compiler = ContextCompiler(root_path=str(target_dir))
-        output_path = compiler.compile()
-        daemon_logger.info(f"Context compiled successfully: {output_path.name}")
-        
-        return JSONResponse(content={
-            "status": "success", 
-            "message": f"Context compiled successfully to {output_path}"
-        })
-    except Exception as e:
-        daemon_logger.error(f"Context compilation failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+    # Removed the try/except block. Let it bubble up!
+    compiler = ContextCompiler(root_path=str(target_dir))
+    output_path = compiler.compile()
+    daemon_logger.info(f"Context compiled successfully: {output_path.name}")
+    
+    return JSONResponse(content={
+        "status": "success", 
+        "message": f"Context compiled successfully to {output_path}"
+    })
 
-
-# ... [Inside force_commit] ...
 @app.post("/force-commit", status_code=status.HTTP_200_OK)
 async def force_commit(request: ProjectRequest) -> JSONResponse:
-    # REPLACE: target_dir = Path(request.project_path).resolve()
     target_dir = secure_resolve_path(request.project_path)
-    
     daemon_logger.info(f"Received request to force commit for: {target_dir}")
-    # ... rest of the function
     
     if not target_dir.exists() or not target_dir.is_dir():
         raise HTTPException(status_code=400, detail="Invalid project directory path.")
 
-    try:
-        git_mgr = GitManager(repo_path=str(target_dir))
-        commit_msg = git_mgr.force_ai_commit()
-        
-        daemon_logger.info(f"Commit generated: {commit_msg}")
-        return JSONResponse(content={
-            "status": "success", 
-            "message": f"Committed successfully:\n{commit_msg}"
-        })
-    except Exception as e:
-        daemon_logger.error(f"Commit failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+    # Removed the try/except block. Let it bubble up!
+    git_mgr = GitManager(repo_path=str(target_dir))
+    commit_msg = git_mgr.force_ai_commit()
+    
+    daemon_logger.info(f"Commit generated: {commit_msg}")
+    return JSONResponse(content={
+        "status": "success", 
+        "message": f"Committed successfully:\n{commit_msg}"
+    })
 
 @app.post("/log-crash", status_code=status.HTTP_200_OK)
 async def log_crash(request: CrashLogRequest) -> JSONResponse:

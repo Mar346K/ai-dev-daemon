@@ -1,6 +1,6 @@
 import git
 from pathlib import Path
-from app.core.security import redact_secrets_in_file
+from app.core.security import scan_file_for_secrets # <-- Updated import
 from app.core.ai_router import AIRouter
 
 class GitManager:
@@ -19,7 +19,7 @@ class GitManager:
 
     def process_and_stage_changes(self) -> bool:
         """
-        Iterates over untracked and modified files, runs the security redaction,
+        Iterates over untracked and modified files, runs the strict security scan,
         and stages them. Returns True if files were staged.
         """
         changed_files = [item.a_path for item in self.repo.index.diff(None)]
@@ -33,7 +33,9 @@ class GitManager:
         for file_str in all_files_to_process:
             file_path = self.repo_path / file_str
             if file_path.is_file():
-                redact_secrets_in_file(file_path)
+                # STRICT SCAN: If a secret is found, this raises an HTTPException,
+                # immediately halting the execution before the file can be staged.
+                scan_file_for_secrets(file_path)
                 self.repo.git.add(file_str)
                 
         return True

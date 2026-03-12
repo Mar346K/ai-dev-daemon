@@ -1,82 +1,54 @@
-# AI Dev Daemon 🧠⚙️
+# AI Dev Daemon - Control Center
 
-A local, AI-powered developer dashboard and autonomous version control daemon. Designed to eliminate context-switching by automating Git commits, compiling repository context, tracking active debugging loops in memory, and enforcing strict DevSecOps security boundaries before any code reaches the LLM.
+An enterprise-grade, local DevSecOps daemon designed to actively monitor Python processes, intercept system crashes, and utilize a local LLM to generate real-time root-cause analysis and actionable hotfixes—all within a completely air-gapped, offline environment.
 
-## 🏗️ System Architecture & Features
+## 🏗️ Architecture Overview
 
-This system is built with an asynchronous, API-first client-server architecture, strictly separating the native desktop frontend from the heavy backend AI processing and state management.
+The system is split into a highly optimized PySide6 C++ UI and a high-performance asynchronous FastAPI backend, connected via strict IPC bearer-token authentication.
 
-* **Zero-Trust DevSecOps Pipeline:** Enforces cryptographic path jailing to prevent directory traversal, global HTTP error masking to prevent stack-trace leaks, and an aggressive **Halt-and-Catch-Fire (HCF)** secret scanner that instantly aborts operations if hardcoded credentials are detected.
-* **Hardware-Aware Graceful Degradation:** Integrates OS-level `psutil` circuit breakers. If system RAM or compute pressure reaches critical thresholds, the API rejects AI routing requests with a 503, protecting the host machine from out-of-memory driver crashes.
-* **RAM-Bound Ephemeral Vector State:** Utilizes a completely in-memory ChromaDB instance to track current debugging sessions. This prevents cross-session state leakage and eliminates disk I/O bottlenecks when the 70B architectural model detects logic loops.
-* **Prompt Injection Fencing:** Untrusted user code and Git diffs are strictly wrapped in neutralized XML tags before being passed to local models, neutralizing injection escape attempts.
-* **Zero-Cost Context Compiler:** Instantly packages entire repository architectures into a sanitized, LLM-ready Markdown payload while actively blocking heavy virtual environments, binary databases (`.sqlite3`), and `.git` folders.
-* **Hardware-Decoupled Native UI (PySide6):** A multi-threaded dashboard running entirely on software rendering. This explicitly decouples the UI from the GPU, maintaining a fluid interface even when local LLMs max out hardware compute.
+### Frontend: The Operator Dashboard (`/frontend`)
+* **Strict C++ Boundary Typing:** PySide6 signals and slots are strictly typed with C++ primitives (`bool`, `str`) to prevent Python memory objects from corrupting the Qt event loop.
+* **Deterministic State Machine:** A mathematically locked `UIState` enum (IDLE, BUSY_COMPILING, etc.) prevents race conditions and multi-click thread collisions.
+* **Native Async Event Loop:** Bypasses heavy OS-level Python threads in favor of Qt's native `QNetworkAccessManager` for zero-blocking fire-and-forget telemetry.
+* **Cryptographic Air-Gap Indicator:** Persistently hashes the target workspace directory via SHA-256 to provide real-time visual proof of local containment.
+* **Structlog JSON Ingestion:** Features a 1000-block ring-buffer memory limit that dynamically parses JSON error logs and applies severity-based HTML rendering.
+* **Zombie Process Prevention:** OS-level subprocess bindings ensure child processes die gracefully if the daemon experiences a hard crash.
 
-## 🛠️ Tech Stack
+### Backend: The AI Healer (`/backend`)
+* **Asynchronous Telemetry Debouncer:** A custom `asyncio` 1.5-second buffer that catches rapid-fire, multi-line Python Tracebacks and merges them into a single, unified payload to prevent LLM hallucination.
+* **Local AI Agentic Workflow:** Leverages `BackgroundTasks` to asynchronously spool up a local LLM for crash diagnosis without blocking the main FastAPI event loop.
+* **Fire-and-Forget Security:** Catches unhandled exceptions, logs them securely to project-specific targets, and masks internal server errors from the client.
 
-* **Frontend:** PySide6 (Qt for Python)
-* **Backend:** FastAPI, Uvicorn, Pydantic-Settings
-* **AI & State:** Ollama (Llama 3.1 8B, Llama 3.3 70B), ChromaDB Ephemeral
-* **Concurrency & I/O:** AnyIO (Async Threading), QThread, Subprocess
-* **Observability:** Structlog (JSON Structured Logging)
-* **DevSecOps:** Docker (Least-Privilege Containerization), Pytest-Asyncio
+## 🖥️ Hardware Profile
+This daemon is specifically optimized and tested for local AI inference with the following hardware specifications:
+* **CPU:** Intel Core i7 (9th Gen)
+* **RAM:** 128 GB
+* **GPU:** Intel Arc A770 (16GB VRAM)
+* **Model:** `llama3.1` (8B Parameters - fits entirely in VRAM for rapid response times)
 
 ## 🚀 Getting Started
 
-### Prerequisites
-* Python 3.13+
-* [Ollama](https://ollama.com/) installed and running locally.
-* Required Local Models: 
-  * `ollama pull llama3.1` (Rapid commit generation)
-  * `ollama pull llama3.3:70b` (Deep architectural review)
-  * `ollama pull nomic-embed-text` (Vector embedding)
-
-### 1. Installation
-
-Clone the repository and set up your virtual environment:
+### 1. Launch the Backend
+Open a terminal, activate your backend virtual environment, and start the FastAPI server:
 ```bash
-git clone [https://github.com/Mar346k/ai-dev-daemon.git](https://github.com/Mar346k/ai-dev-daemon.git)
-cd ai-dev-daemon
-
-python -m venv .venv
-source .venv/Scripts/activate  # Windows: .venv\Scripts\activate
-```
-Install both backend and frontend dependencies:
-
-```Bash
-pip install -r backend/requirements.txt
-pip install -r frontend/requirements.txt
-```
-
-### 2. Configuration & Security
-The daemon utilizes strict path jailing. You must define your authorized workspace, or the API will block all file access.
-
-Create a .env file inside the backend/ directory:
-
-```Bash
-# backend/.env
-DAEMON_WORKSPACE=C:\Path\To\Your\Projects
-```
-
-### 3. Execution
-The system requires both the backend API and the frontend UI to be running simultaneously.
-
-* Start the AI Backend:
-Open a terminal, activate your environment, and run the ASGI server:
-
-```Bash
 cd backend
-uvicorn app.main:app --host 127.0.0.1 --port 8000
+venv\Scripts\activate
+uvicorn app.main:app --reload
 ```
 
-* Launch the Control Center:
-Open a second terminal, activate your environment, and launch the PySide6 dashboard:
+### 2. Launch the Frontend
+Open a second terminal, activate the frontend virtual environment, and launch the Qt Dashboard:
 
 ```Bash
 cd frontend
+venv\Scripts\activate
 python main.py
 ```
+### 3. The DevSecOps Loop
+Browse to your target project folder in the UI.
 
-🔒 Security Posture
-This system operates under a strict Halt-and-Catch-Fire security protocol. Unlike legacy tools that silently mutate or redact code, if this daemon detects a leaked API key or secret in your Git diff, the entire pipeline violently aborts, throws a 400 Bad Request, and refuses to stage the commit. This forces developers to utilize environment variables rather than relying on automated redaction safety nets.
+Ensure the bottom status bar reads 🟢 CONNECTED and displays the 🔒 Workspace Hash.
+
+Run a target Python script.
+
+If the script throws a critical exception, the daemon will instantly route the telemetry to the backend, trigger the local Ollama instance, and print an AI-generated hotfix (e.g., specific sed commands or code adjustments) directly to your backend console.

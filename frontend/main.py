@@ -46,7 +46,6 @@ class APIWorker(QThread):
         except Exception as e:
             self.error_signal.emit(str(e))
 
-
 class ProjectRunnerWorker(QThread):
     log_signal = Signal(str)
     
@@ -67,13 +66,24 @@ class ProjectRunnerWorker(QThread):
                 self.log_signal.emit(f"⚠️ [CRITICAL] Execution Aborted: File not found at {script_path}")
                 return
 
+            # Prepare standard arguments
+            kwargs = {
+                "stdout": subprocess.PIPE,
+                "stderr": subprocess.STDOUT, 
+                "text": True,
+                "bufsize": 1,
+                "cwd": str(script_path.parent) 
+            }
+
+            # === UPGRADE 1.4: OS-Level Subprocess Zombie Prevention ===
+            # Binds the child process to the parent so it dies if the dashboard hard-crashes
+            if sys.platform == "win32":
+                kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+            # ==========================================================
+
             process = subprocess.Popen(
                 [sys.executable, "-u", str(script_path)],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT, 
-                text=True,
-                bufsize=1,
-                cwd=str(script_path.parent) 
+                **kwargs
             )
             
             self.log_signal.emit(f">>> Target project '{script_path.name}' launched.")
@@ -99,7 +109,6 @@ class ProjectRunnerWorker(QThread):
             
         except Exception as e:
              self.log_signal.emit(f"⚠️ [CRITICAL] Subprocess failed: {e}")
-
 
 class AIDevDashboard(QMainWindow):
     def __init__(self):
@@ -368,7 +377,6 @@ class AIDevDashboard(QMainWindow):
 
         self.log_viewer.append(">>> Safe shutdown complete.")
         event.accept()
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

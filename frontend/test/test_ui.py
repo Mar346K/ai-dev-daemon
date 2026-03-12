@@ -3,6 +3,10 @@ import json
 from main import AIDevDashboard
 from unittest.mock import MagicMock
 from PySide6.QtGui import QCloseEvent
+import sys
+import subprocess
+from unittest.mock import patch, MagicMock
+from main import ProjectRunnerWorker
 
 def test_ring_buffer_memory_limit(qtbot, monkeypatch):
     """
@@ -84,3 +88,29 @@ def test_deterministic_qthread_teardown(qtbot, monkeypatch):
     
     # Ensure the event was eventually accepted so the window actually closes
     assert close_event.isAccepted()
+
+def test_subprocess_creation_flags(monkeypatch):
+    """
+    Verify that on Windows, the subprocess is created with the 
+    CREATE_NEW_PROCESS_GROUP flag to prevent OS-level zombie processes.
+    """
+    worker = ProjectRunnerWorker("dummy_script.py")
+    
+    with patch("subprocess.Popen") as mock_popen:
+        # Mock path existence so the runner doesn't abort early
+        monkeypatch.setattr("pathlib.Path.exists", lambda self: True)
+        
+        # Mock the stdout iterator to immediately exit the read loop
+        mock_process = MagicMock()
+        mock_process.stdout.readline.side_effect = [''] # Returns empty string to break the loop
+        mock_popen.return_value = mock_process
+        
+        worker.run()
+        
+        # Verify Popen was called
+        mock_popen.assert_called_once()
+        kwargs = mock_popen.call_args[1]
+        
+        if sys.platform == "win32":
+            assert "creationflags" in kwargs
+            assert kwargs["creationflags"] == subprocess.CREATE_NEW_PROCESS_GROUP

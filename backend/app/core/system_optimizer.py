@@ -1,5 +1,28 @@
 import os
 import psutil
+from fastapi import HTTPException
+from app.core.telemetry import daemon_logger
+
+# Professional Standard: Set a strict threshold for hardware saturation
+CRITICAL_MEMORY_THRESHOLD = 90.0
+
+def check_hardware_capacity() -> None:
+    """
+    Acts as a circuit breaker. Checks current system memory pressure.
+    If the system is saturated, raises a 503 to gracefully degrade rather than crash.
+    """
+    mem = psutil.virtual_memory()
+    
+    if mem.percent >= CRITICAL_MEMORY_THRESHOLD:
+        daemon_logger.warning(
+            f"Hardware fencing triggered. System RAM at {mem.percent}%. "
+            "Rejecting AI request to prevent system crash."
+        )
+        raise HTTPException(
+            status_code=503,
+            detail=f"Hardware Fencing: System memory is critically saturated ({mem.percent}%). "
+                   "AI operations temporarily suspended to protect system stability."
+        )
 
 class ResourceOptimizer:
     """

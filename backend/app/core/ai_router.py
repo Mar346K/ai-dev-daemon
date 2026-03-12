@@ -1,6 +1,7 @@
 import httpx
 from typing import Optional
 from app.core.system_optimizer import ResourceOptimizer
+from app.core.system_optimizer import check_hardware_capacity
 
 class AIRouter:
     """
@@ -13,6 +14,8 @@ class AIRouter:
         self.heavy_model = "llama3.3:70b"
 
     def generate_commit_message(self, diff_text: str) -> str:
+        # FENCE: Ensure we have the hardware capacity to run this request
+        check_hardware_capacity()
         # Professional Standard: Use a system-style instruction to limit verbosity
         prompt = (
             "You are a senior software engineer. Write a one-line Git commit message "

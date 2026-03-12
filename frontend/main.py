@@ -1,6 +1,7 @@
 import sys
 import os
 import json
+from PySide6.QtGui import QCloseEvent
 
 # Professional Standard: Decouple PySide6 rendering from the GPU.
 # This makes the UI immune to driver resets when Ollama spikes the VRAM.
@@ -342,6 +343,31 @@ class AIDevDashboard(QMainWindow):
     def _on_commit_error(self, error_msg: str) -> None:
         self.log_viewer.append(f"[ERROR] Manual commit failed: {error_msg}")
         self.btn_manual_commit.setEnabled(True)
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        """
+        Intercepts the window close event to ensure deterministic teardown
+        of all C++ QThread objects before the Python interpreter exits.
+        """
+        workers = [
+            self.commit_worker, 
+            self.compile_worker, 
+            self.project_worker, 
+            self.health_worker
+        ]
+
+        for worker in workers:
+            if worker and worker.isRunning():
+                self.log_viewer.append(">>> Halting background threads for safe shutdown...")
+                # 1. Signal the thread to stop its current loop
+                worker.requestInterruption()
+                # 2. Tell the thread's event loop to exit
+                worker.quit()
+                # 3. Block the main thread for a max of 2 seconds while waiting for C++ to clean up
+                worker.wait(2000) 
+
+        self.log_viewer.append(">>> Safe shutdown complete.")
+        event.accept()
 
 
 if __name__ == "__main__":

@@ -1,6 +1,8 @@
 import pytest
 import json
 from main import AIDevDashboard
+from unittest.mock import MagicMock
+from PySide6.QtGui import QCloseEvent
 
 def test_ring_buffer_memory_limit(qtbot, monkeypatch):
     """
@@ -56,3 +58,29 @@ def test_structlog_json_ingestion(qtbot, monkeypatch):
     window._on_project_log("Standard stdout print statement")
     text_output = window.log_viewer.toPlainText()
     assert "Standard stdout print statement" in text_output
+
+def test_deterministic_qthread_teardown(qtbot, monkeypatch):
+    """
+    Verify that closing the application explicitly cleans up running 
+    background threads to prevent zombie processes and C++ segfaults.
+    """
+    monkeypatch.setattr(AIDevDashboard, "_init_timers", lambda self: None)
+    window = AIDevDashboard()
+    qtbot.addWidget(window)
+    
+    # 1. Inject a mocked active worker thread
+    mock_worker = MagicMock()
+    mock_worker.isRunning.return_value = True
+    window.compile_worker = mock_worker
+    
+    # 2. Simulate the user clicking the "X" to close the window
+    close_event = QCloseEvent()
+    window.closeEvent(close_event)
+    
+    # 3. Mathematical Proof: The C++ teardown sequence MUST be executed
+    mock_worker.requestInterruption.assert_called_once()
+    mock_worker.quit.assert_called_once()
+    mock_worker.wait.assert_called_once()
+    
+    # Ensure the event was eventually accepted so the window actually closes
+    assert close_event.isAccepted()

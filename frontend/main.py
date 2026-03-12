@@ -2,9 +2,20 @@ import sys
 import os
 import json
 import hashlib
+import subprocess
+import re
+import time
+from datetime import datetime, timezone
+from pathlib import Path
 from enum import Enum, auto
-from PySide6.QtGui import QCloseEvent  
-from PySide6.QtCore import QTimer, Qt, QThread, Signal, Slot
+
+from PySide6.QtGui import QCloseEvent
+from PySide6.QtCore import QTimer, Qt, QThread, Signal, Slot, QUrl, QByteArray
+from PySide6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
+from PySide6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QLabel, QPushButton, QTextBrowser, QFrame, QFileDialog, QLineEdit
+)
 
 # Professional Standard: Decouple PySide6 rendering from the GPU.
 # This makes the UI immune to driver resets when Ollama spikes the VRAM.
@@ -18,59 +29,6 @@ class UIState(Enum):
     BUSY_COMMITTING = auto()
     BUSY_RUNNING = auto()
 # ===================================================
-
-import subprocess
-import re
-import time
-from datetime import datetime, timezone
-from pathlib import Path
-import httpx
-from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QTextBrowser, QFrame, QFileDialog, QLineEdit
-)
-from PySide6.QtCore import QTimer, Qt, QThread, Signal
-
-class APIWorker(QThread):
-    # === UPGRADE 3.1: Strict C++ Boundary Typing ===
-    success_signal = Signal(bool, str)
-    error_signal = Signal(str)
-
-    def __init__(self, url: str, method: str = "GET", payload: dict | None = None):
-        super().__init__()
-        self.url = url
-        self.method = method
-        self.payload = payload or {}
-
-    def _get_ipc_token(self) -> str:
-        token_path = Path(__file__).resolve().parent.parent / "backend" / ".daemon_token"
-        try:
-            if token_path.exists():
-                return token_path.read_text(encoding="utf-8").strip()
-        except Exception:
-            pass
-        return ""
-
-    def run(self) -> None:
-        try:
-            headers = {"Authorization": f"Bearer {self._get_ipc_token()}"}
-            with httpx.Client(timeout=90.0) as client: 
-                if self.method == "GET":
-                    response = client.get(self.url, headers=headers)
-                elif self.method == "POST":
-                    response = client.post(self.url, json=self.payload, headers=headers)
-                response.raise_for_status()
-                
-                # Extract relevant string data to safely pass across the C++ boundary
-                data = response.json()
-                msg = data.get("message", data.get("status", "success"))
-                self.success_signal.emit(True, str(msg))
-                
-        except httpx.HTTPStatusError as exc:
-            err_detail = exc.response.json().get("detail", str(exc))
-            self.error_signal.emit(f"API Error: {err_detail}")
-        except Exception as e:
-            self.error_signal.emit(str(e))
 
 class ProjectRunnerWorker(QThread):
     log_signal = Signal(str)
@@ -102,7 +60,6 @@ class ProjectRunnerWorker(QThread):
             }
 
             # === UPGRADE 1.4: OS-Level Subprocess Zombie Prevention ===
-            # Binds the child process to the parent so it dies if the dashboard hard-crashes
             if sys.platform == "win32":
                 kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
             # ==========================================================
@@ -136,6 +93,7 @@ class ProjectRunnerWorker(QThread):
         except Exception as e:
              self.log_signal.emit(f"⚠️ [CRITICAL] Subprocess failed: {e}")
 
+
 class AIDevDashboard(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -145,14 +103,14 @@ class AIDevDashboard(QMainWindow):
         self.session_start_time = datetime.now(timezone.utc)
         self.api_url = "http://localhost:8000"
         
-        # Initialize UI State Machine
         self.current_state = UIState.IDLE
         
-        # Professional Standard: Permanent resident workers
-        self.commit_worker = None
-        self.compile_worker = None
+        # === UPGRADE 3.3: Native QNetworkAccessManager ===
+        # Replaces heavy QThreads with native Qt event loop async networking
+        self.network_manager = QNetworkAccessManager(self)
+        # =================================================
+        
         self.project_worker = None
-        self.health_worker = None
 
         self._init_ui()
         self._init_timers()
@@ -217,7 +175,6 @@ class AIDevDashboard(QMainWindow):
         self.log_viewer.setStyleSheet("background-color: #1e1e1e; color: #d4d4d4; font-family: monospace;")
         
         # === UPGRADE 1.1: Strict Ring-Buffer Memory Limit ===
-        # Caps the DOM tree at 1000 blocks to prevent out-of-memory crashes during long sessions
         self.log_viewer.document().setMaximumBlockCount(1000)
         # ====================================================
         
@@ -272,12 +229,33 @@ class AIDevDashboard(QMainWindow):
         minutes, seconds = divmod(remainder, 60)
         self.lbl_timer.setText(f"Active Session: {hours:02d}:{minutes:02d}:{seconds:02d}")
 
+    # --- NEW NETWORKING HELPER ---
+    def _create_secure_request(self, endpoint: str) -> QNetworkRequest:
+        """Constructs a QNetworkRequest with the required IPC Bearer token."""
+        req = QNetworkRequest(QUrl(f"{self.api_url}{endpoint}"))
+        req.setHeader(QNetworkRequest.KnownHeaders.ContentTypeHeader, "application/json")
+        
+        token_path = Path(__file__).resolve().parent.parent / "backend" / ".daemon_token"
+        token = token_path.read_text(encoding="utf-8").strip() if token_path.exists() else ""
+        req.setRawHeader(QByteArray(b"Authorization"), QByteArray(f"Bearer {token}".encode()))
+        
+        return req
+
+    # --- REWRITTEN API METHODS ---
     def _ping_backend(self) -> None:
-        self.health_worker = APIWorker(f"{self.api_url}/health")
-        self.health_worker.setParent(self)
-        self.health_worker.success_signal.connect(self._on_health_success)
-        self.health_worker.error_signal.connect(self._on_health_error)
-        self.health_worker.start()
+        req = self._create_secure_request("/health")
+        reply = self.network_manager.get(req)
+        reply.finished.connect(lambda r=reply: self._on_health_reply(r))
+
+    def _on_health_reply(self, reply: QNetworkReply) -> None:
+        try:
+            if reply.error() == QNetworkReply.NetworkError.NoError:
+                data = json.loads(reply.readAll().data().decode())
+                self._on_health_success(True, data.get("status", "unknown"))
+            else:
+                self._on_health_error(reply.errorString())
+        finally:
+            reply.deleteLater() # Critical for C++ memory management
 
     @Slot(bool, str)
     def _on_health_success(self, status: bool, message: str) -> None:
@@ -300,12 +278,26 @@ class AIDevDashboard(QMainWindow):
         target_path = self.txt_project_path.text()
         self.log_viewer.append(f">>> Compiling repository context for '{Path(target_path).name}'... Please wait.")
         
-        payload = {"project_path": target_path}
-        self.compile_worker = APIWorker(f"{self.api_url}/compile-context", method="POST", payload=payload)
-        self.compile_worker.setParent(self)
-        self.compile_worker.success_signal.connect(self._on_compile_success)
-        self.compile_worker.error_signal.connect(self._on_compile_error)
-        self.compile_worker.start()
+        req = self._create_secure_request("/compile-context")
+        payload = json.dumps({"project_path": target_path}).encode("utf-8")
+        
+        reply = self.network_manager.post(req, QByteArray(payload))
+        reply.finished.connect(lambda r=reply: self._on_compile_reply(r))
+
+    def _on_compile_reply(self, reply: QNetworkReply) -> None:
+        try:
+            if reply.error() == QNetworkReply.NetworkError.NoError:
+                data = json.loads(reply.readAll().data().decode())
+                self._on_compile_success(True, data.get("message", "Success"))
+            else:
+                try:
+                    err_data = json.loads(reply.readAll().data().decode())
+                    msg = err_data.get("detail", reply.errorString())
+                except:
+                    msg = reply.errorString()
+                self._on_compile_error(msg)
+        finally:
+            reply.deleteLater()
 
     @Slot(bool, str)
     def _on_compile_success(self, status: bool, message: str) -> None:
@@ -338,53 +330,44 @@ class AIDevDashboard(QMainWindow):
         self.project_worker.setParent(self)
         self.project_worker.log_signal.connect(self._on_project_log)
         
-        # We need to hook up a way to transition back to IDLE when the script finishes.
-        # For now, we will add a finished signal hook:
         self.project_worker.finished.connect(lambda: self._transition_state(UIState.IDLE))
-        
         self.project_worker.start()
 
     def _on_project_log(self, log_entry: str) -> None:
         try:
-            # Attempt to parse as structured JSON (Structlog format)
             log_data = json.loads(log_entry)
             level = log_data.get("level", "info").lower()
             timestamp = log_data.get("timestamp", "")
             event = log_data.get("event", "Unknown Event")
 
-            # Professional Standard: Color-code by severity
             if level in ["error", "critical", "exception"]:
-                color = "#ff5555"  # Red
+                color = "#ff5555"  
             elif level == "warning":
-                color = "#ffb86c"  # Orange/Yellow
+                color = "#ffb86c"  
             else:
-                color = "#50fa7b"  # Green
+                color = "#50fa7b"  
 
-            # Inject rich HTML into the viewer
             html = f"<span style='color:{color}'>[{timestamp}] {level.upper()}: {event}</span>"
             self.log_viewer.append(html)
             
-            # Maintain crash routing for critical structured logs
+            # Fire-and-forget native async crash routing
             if level in ["error", "critical"]:
                 project_name = Path(self.txt_project_path.text()).name
-                payload = {"project_name": project_name, "log_message": log_entry}
-                try:
-                    httpx.post(f"{self.api_url}/log-crash", json=payload, timeout=3.0)
-                except Exception:
-                    pass
+                payload = json.dumps({"project_name": project_name, "log_message": log_entry}).encode("utf-8")
+                req = self._create_secure_request("/log-crash")
+                reply = self.network_manager.post(req, QByteArray(payload))
+                reply.finished.connect(reply.deleteLater)
 
         except json.JSONDecodeError:
-            # Fallback for standard non-JSON print() statements
             self.log_viewer.append(log_entry)
             
-            # Maintain legacy crash routing
+            # Fire-and-forget native async crash routing
             if "⚠️ [CRITICAL]" in log_entry:
                 project_name = Path(self.txt_project_path.text()).name
-                payload = {"project_name": project_name, "log_message": log_entry}
-                try:
-                    httpx.post(f"{self.api_url}/log-crash", json=payload, timeout=3.0)
-                except Exception:
-                    pass
+                payload = json.dumps({"project_name": project_name, "log_message": log_entry}).encode("utf-8")
+                req = self._create_secure_request("/log-crash")
+                reply = self.network_manager.post(req, QByteArray(payload))
+                reply.finished.connect(reply.deleteLater)
 
     def _trigger_manual_commit(self) -> None:
         if self.current_state != UIState.IDLE:
@@ -395,14 +378,26 @@ class AIDevDashboard(QMainWindow):
         target_path = self.txt_project_path.text()
         self.log_viewer.append(f">>> Analyzing diffs with 8B Model... (Hardware spooling detected)")
         
-        payload = {"project_path": target_path}
+        req = self._create_secure_request("/force-commit")
+        payload = json.dumps({"project_path": target_path}).encode("utf-8")
         
-        self.commit_worker = APIWorker(f"{self.api_url}/force-commit", method="POST", payload=payload)
-        self.commit_worker.setParent(self) 
-        
-        self.commit_worker.success_signal.connect(self._on_commit_success)
-        self.commit_worker.error_signal.connect(self._on_commit_error)
-        self.commit_worker.start()
+        reply = self.network_manager.post(req, QByteArray(payload))
+        reply.finished.connect(lambda r=reply: self._on_commit_reply(r))
+
+    def _on_commit_reply(self, reply: QNetworkReply) -> None:
+        try:
+            if reply.error() == QNetworkReply.NetworkError.NoError:
+                data = json.loads(reply.readAll().data().decode())
+                self._on_commit_success(True, data.get("message", "Success"))
+            else:
+                try:
+                    err_data = json.loads(reply.readAll().data().decode())
+                    msg = err_data.get("detail", reply.errorString())
+                except:
+                    msg = reply.errorString()
+                self._on_commit_error(msg)
+        finally:
+            reply.deleteLater()
 
     @Slot(bool, str)
     def _on_commit_success(self, status: bool, message: str) -> None:
@@ -419,25 +414,19 @@ class AIDevDashboard(QMainWindow):
         Intercepts the window close event to ensure deterministic teardown
         of all C++ QThread objects before the Python interpreter exits.
         """
-        workers = [
-            self.commit_worker, 
-            self.compile_worker, 
-            self.project_worker, 
-            self.health_worker
-        ]
+        # We only have one QThread left to manage!
+        workers = [self.project_worker]
 
         for worker in workers:
             if worker and worker.isRunning():
                 self.log_viewer.append(">>> Halting background threads for safe shutdown...")
-                # 1. Signal the thread to stop its current loop
                 worker.requestInterruption()
-                # 2. Tell the thread's event loop to exit
                 worker.quit()
-                # 3. Block the main thread for a max of 2 seconds while waiting for C++ to clean up
                 worker.wait(2000) 
 
         self.log_viewer.append(">>> Safe shutdown complete.")
         event.accept()
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

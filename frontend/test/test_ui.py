@@ -68,14 +68,16 @@ def test_deterministic_qthread_teardown(qtbot, monkeypatch):
     Verify that closing the application explicitly cleans up running 
     background threads to prevent zombie processes and C++ segfaults.
     """
-    monkeypatch.setattr(AIDevDashboard, "_init_timers", lambda self: None)
+    monkeypatch.setattr("main.AIDevDashboard._init_timers", lambda self: None)
     window = AIDevDashboard()
     qtbot.addWidget(window)
     
     # 1. Inject a mocked active worker thread
     mock_worker = MagicMock()
     mock_worker.isRunning.return_value = True
-    window.compile_worker = mock_worker
+    
+    # FIX: We deleted compile_worker! We only have project_worker left to manage.
+    window.project_worker = mock_worker 
     
     # 2. Simulate the user clicking the "X" to close the window
     close_event = QCloseEvent()
@@ -114,37 +116,6 @@ def test_subprocess_creation_flags(monkeypatch):
         if sys.platform == "win32":
             assert "creationflags" in kwargs
             assert kwargs["creationflags"] == subprocess.CREATE_NEW_PROCESS_GROUP
-
-from main import APIWorker
-
-def test_ipc_bearer_token_injection(monkeypatch):
-    """
-    Verify that the APIWorker securely reads the local IPC token
-    and injects it into the Authorization header of every request.
-    """
-    from unittest.mock import patch, MagicMock
-    
-    # 1. Mock the file system to pretend the .daemon_token file exists
-    monkeypatch.setattr("main.Path.exists", lambda self: True)
-    monkeypatch.setattr("main.Path.read_text", lambda *args, **kwargs: "secure_ipc_token_123")
-    
-    worker = APIWorker("http://fake-url", method="GET")
-    
-    with patch("main.httpx.Client") as mock_client_class:
-        # Setup the deep mock for the context manager and the get() method
-        mock_client_instance = mock_client_class.return_value.__enter__.return_value
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"status": "ok"}
-        mock_client_instance.get.return_value = mock_response
-        
-        worker.run()
-        
-        # 2. Verify the GET request was made with the strict Authorization header
-        mock_client_instance.get.assert_called_once()
-        kwargs = mock_client_instance.get.call_args[1]
-        
-        assert "headers" in kwargs
-        assert kwargs["headers"]["Authorization"] == "Bearer secure_ipc_token_123"
 
 def test_cryptographic_air_gap_indicator(qtbot, monkeypatch):
     """
@@ -195,3 +166,29 @@ def test_deterministic_ui_state_machine(qtbot, monkeypatch):
     window._transition_state(UIState.IDLE)
     assert window.btn_manual_commit.isEnabled() is True
     assert window.btn_browse.isEnabled() is True
+
+def test_native_network_manager_auth_injection(qtbot, monkeypatch):
+    """
+    Verify that the native QNetworkAccessManager securely resolves the 
+    hidden IPC token and injects it into the Qt C++ QNetworkRequest headers.
+    """
+    monkeypatch.setattr("main.AIDevDashboard._init_timers", lambda self: None)
+    
+    # 1. Mock the file system to pretend the .daemon_token file exists
+    monkeypatch.setattr("main.Path.exists", lambda self: True)
+    monkeypatch.setattr("main.Path.read_text", lambda *args, **kwargs: "qt_secure_token_999")
+    
+    window = AIDevDashboard()
+    qtbot.addWidget(window)
+    
+    # 2. Trigger the secure request builder
+    req = window._create_secure_request("/test-endpoint")
+    
+    # 3. Extract the raw C++ byte array header and verify it
+    # FIX: The PySide6 binding for rawHeader lookup explicitly requires a string!
+    raw_header = req.rawHeader("Authorization")
+    
+    # Safely decode the return type (handles both raw bytes and QByteArray objects)
+    auth_string = raw_header.data().decode() if hasattr(raw_header, "data") else raw_header.decode()
+    
+    assert auth_string == "Bearer qt_secure_token_999"

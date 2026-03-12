@@ -1,0 +1,58 @@
+import pytest
+import json
+from main import AIDevDashboard
+
+def test_ring_buffer_memory_limit(qtbot, monkeypatch):
+    """
+    Verify that the log viewer strictly enforces a block limit, 
+    preventing infinite RAM expansion over long sessions.
+    """
+    # FIX: Neuter the timers to prevent background QThreads from 
+    # causing a C++ segfault when the test tears down the window.
+    monkeypatch.setattr(AIDevDashboard, "_init_timers", lambda self: None)
+    
+    # qtbot automatically handles widget instantiation and cleanup
+    window = AIDevDashboard()
+    qtbot.addWidget(window)
+    
+    # 1. Verify the architectural limit is set to 1000 lines
+    limit = window.log_viewer.document().maximumBlockCount()
+    assert limit == 1000, f"Expected memory limit of 1000, got {limit}"
+    
+    # 2. Simulate a heavy log flood (1500 lines)
+    for i in range(1500):
+        window.log_viewer.append(f"Simulated log payload line {i}")
+        
+    # 3. Mathematical Proof: The document must have discarded the oldest 500 lines
+    current_blocks = window.log_viewer.document().blockCount()
+    assert current_blocks == 1000, f"Memory leak detected! Expected 1000 blocks, got {current_blocks}"
+
+def test_structlog_json_ingestion(qtbot, monkeypatch):
+    """
+    Verify the frontend correctly parses JSON logs and renders severity-based HTML,
+    while maintaining fallback support for standard plaintext print statements.
+    """
+    monkeypatch.setattr(AIDevDashboard, "_init_timers", lambda self: None)
+    window = AIDevDashboard()
+    qtbot.addWidget(window)
+    
+    window.log_viewer.clear()
+    
+    # 1. Inject a mocked Structlog JSON payload (Simulating an Error)
+    mock_log = json.dumps({
+        "level": "error",
+        "event": "Database connection failed",
+        "timestamp": "2026-03-12T10:30:00Z"
+    })
+    window._on_project_log(mock_log)
+    
+    # 2. Verify HTML rendering triggered with the correct color and data
+    html_output = window.log_viewer.toHtml()
+    assert "#ff5555" in html_output  # Hex color for errors
+    assert "Database connection failed" in html_output
+    assert "2026-03-12T10:30:00Z" in html_output
+    
+    # 3. Inject a raw text payload (Simulating a standard print statement fallback)
+    window._on_project_log("Standard stdout print statement")
+    text_output = window.log_viewer.toPlainText()
+    assert "Standard stdout print statement" in text_output

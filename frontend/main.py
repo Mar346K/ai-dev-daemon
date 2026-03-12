@@ -1,5 +1,6 @@
 import sys
 import os
+import json
 
 # Professional Standard: Decouple PySide6 rendering from the GPU.
 # This makes the UI immune to driver resets when Ollama spikes the VRAM.
@@ -163,6 +164,12 @@ class AIDevDashboard(QMainWindow):
         # Logs Viewer
         self.log_viewer = QTextBrowser()
         self.log_viewer.setStyleSheet("background-color: #1e1e1e; color: #d4d4d4; font-family: monospace;")
+        
+        # === UPGRADE 1.1: Strict Ring-Buffer Memory Limit ===
+        # Caps the DOM tree at 1000 blocks to prevent out-of-memory crashes during long sessions
+        self.log_viewer.document().setMaximumBlockCount(1000)
+        # ====================================================
+        
         self.log_viewer.append(">>> UI Initialized. Awaiting backend connection...")
         main_layout.addWidget(self.log_viewer)
 
@@ -268,15 +275,46 @@ class AIDevDashboard(QMainWindow):
         self.project_worker.start()
 
     def _on_project_log(self, log_entry: str) -> None:
-        self.log_viewer.append(log_entry)
-        
-        if "⚠️ [CRITICAL]" in log_entry:
-            project_name = Path(self.txt_project_path.text()).name
-            payload = {"project_name": project_name, "log_message": log_entry}
-            try:
-                httpx.post(f"{self.api_url}/log-crash", json=payload, timeout=3.0)
-            except Exception:
-                pass
+        try:
+            # Attempt to parse as structured JSON (Structlog format)
+            log_data = json.loads(log_entry)
+            level = log_data.get("level", "info").lower()
+            timestamp = log_data.get("timestamp", "")
+            event = log_data.get("event", "Unknown Event")
+
+            # Professional Standard: Color-code by severity
+            if level in ["error", "critical", "exception"]:
+                color = "#ff5555"  # Red
+            elif level == "warning":
+                color = "#ffb86c"  # Orange/Yellow
+            else:
+                color = "#50fa7b"  # Green
+
+            # Inject rich HTML into the viewer
+            html = f"<span style='color:{color}'>[{timestamp}] {level.upper()}: {event}</span>"
+            self.log_viewer.append(html)
+            
+            # Maintain crash routing for critical structured logs
+            if level in ["error", "critical"]:
+                project_name = Path(self.txt_project_path.text()).name
+                payload = {"project_name": project_name, "log_message": log_entry}
+                try:
+                    httpx.post(f"{self.api_url}/log-crash", json=payload, timeout=3.0)
+                except Exception:
+                    pass
+
+        except json.JSONDecodeError:
+            # Fallback for standard non-JSON print() statements
+            self.log_viewer.append(log_entry)
+            
+            # Maintain legacy crash routing
+            if "⚠️ [CRITICAL]" in log_entry:
+                project_name = Path(self.txt_project_path.text()).name
+                payload = {"project_name": project_name, "log_message": log_entry}
+                try:
+                    httpx.post(f"{self.api_url}/log-crash", json=payload, timeout=3.0)
+                except Exception:
+                    pass
 
     def _trigger_manual_commit(self) -> None:
         """Triggers the backend API with the Persistent Resident Anchor."""

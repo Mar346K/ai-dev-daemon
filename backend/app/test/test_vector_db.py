@@ -6,6 +6,16 @@ from app.core.vector_db import DualBrainDB
 # Professional Standard: Forcefully silence third-party library noise
 logging.getLogger("chromadb.telemetry.product.posthog").setLevel(logging.CRITICAL)
 
+# === ADDED FIX: Mock Ollama so GitHub Actions doesn't crash on Linux ===
+@pytest.fixture(autouse=True)
+def mock_ollama_embeddings(monkeypatch):
+    """Prevents ChromaDB from hitting a live Ollama API during CI tests."""
+    monkeypatch.setattr(
+        "app.core.vector_db.OllamaEmbeddingAdapter.__call__",
+        lambda self, input: [[0.1] * 768] * len(input)
+    )
+# =======================================================================
+
 def test_debugging_loop_detection() -> None:
     db = DualBrainDB()
     db.log_diff(str(uuid.uuid4()), "+    print('Fixing the bug')")

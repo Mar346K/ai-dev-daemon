@@ -114,3 +114,34 @@ def test_subprocess_creation_flags(monkeypatch):
         if sys.platform == "win32":
             assert "creationflags" in kwargs
             assert kwargs["creationflags"] == subprocess.CREATE_NEW_PROCESS_GROUP
+
+from main import APIWorker
+
+def test_ipc_bearer_token_injection(monkeypatch):
+    """
+    Verify that the APIWorker securely reads the local IPC token
+    and injects it into the Authorization header of every request.
+    """
+    from unittest.mock import patch, MagicMock
+    
+    # 1. Mock the file system to pretend the .daemon_token file exists
+    monkeypatch.setattr("main.Path.exists", lambda self: True)
+    monkeypatch.setattr("main.Path.read_text", lambda *args, **kwargs: "secure_ipc_token_123")
+    
+    worker = APIWorker("http://fake-url", method="GET")
+    
+    with patch("main.httpx.Client") as mock_client_class:
+        # Setup the deep mock for the context manager and the get() method
+        mock_client_instance = mock_client_class.return_value.__enter__.return_value
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"status": "ok"}
+        mock_client_instance.get.return_value = mock_response
+        
+        worker.run()
+        
+        # 2. Verify the GET request was made with the strict Authorization header
+        mock_client_instance.get.assert_called_once()
+        kwargs = mock_client_instance.get.call_args[1]
+        
+        assert "headers" in kwargs
+        assert kwargs["headers"]["Authorization"] == "Bearer secure_ipc_token_123"

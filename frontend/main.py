@@ -30,16 +30,34 @@ class APIWorker(QThread):
         self.method = method
         self.payload = payload or {}
 
+    def _get_ipc_token(self) -> str:
+        """
+        Securely resolves the backend's hidden IPC token file.
+        Returns the token string, or an empty string if not yet initialized.
+        """
+        # Resolve the path relative to this frontend script (../backend/.daemon_token)
+        token_path = Path(__file__).resolve().parent.parent / "backend" / ".daemon_token"
+        try:
+            if token_path.exists():
+                return token_path.read_text(encoding="utf-8").strip()
+        except Exception:
+            pass
+        return ""
+
     def run(self) -> None:
         try:
-            # Increased to 90 seconds to handle GPU cold starts and heavy 8B model loading
+            # === UPGRADE 2.1: Ephemeral IPC Bearer Authentication ===
+            headers = {"Authorization": f"Bearer {self._get_ipc_token()}"}
+            # ========================================================
+            
             with httpx.Client(timeout=90.0) as client: 
                 if self.method == "GET":
-                    response = client.get(self.url)
+                    response = client.get(self.url, headers=headers)
                 elif self.method == "POST":
-                    response = client.post(self.url, json=self.payload)
+                    response = client.post(self.url, json=self.payload, headers=headers)
                 response.raise_for_status()
                 self.success_signal.emit(response.json())
+                
         except httpx.HTTPStatusError as exc:
             err_detail = exc.response.json().get("detail", str(exc))
             self.error_signal.emit(f"API Error: {err_detail}")

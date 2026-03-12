@@ -1,68 +1,82 @@
 # AI Dev Daemon 🧠⚙️
 
-A local, AI-powered developer dashboard and autonomous version control daemon. Designed to eliminate context-switching by automating Git commits, compiling repository context, and managing isolated crash telemetry through a hardware-aware native UI.
+A local, AI-powered developer dashboard and autonomous version control daemon. Designed to eliminate context-switching by automating Git commits, compiling repository context, tracking active debugging loops in memory, and enforcing strict DevSecOps security boundaries before any code reaches the LLM.
 
 ## 🏗️ System Architecture & Features
 
-This system is built with an API-first client-server architecture, strictly separating the native desktop frontend from the heavy backend AI processing.
+This system is built with an asynchronous, API-first client-server architecture, strictly separating the native desktop frontend from the heavy backend AI processing and state management.
 
-* **Hardware-Aware Native UI (PySide6):** A multi-threaded, asynchronous dashboard running entirely on software rendering. This explicitly decouples the UI from the GPU, preventing OS-level graphics driver crashes (TDR) when local LLMs max out VRAM.
-* **Autonomous Version Control:** A background agent that extracts `git diffs`, scrubs them for hardcoded secrets, and leverages a local Llama 3.1 8B model to generate professional, one-line commit messages and stage files automatically.
-* **Smart Telemetry & Crash Routing:** Executes target Python scripts in isolated subprocesses. It filters standard terminal noise using Regex, deduplicates rapid-fire exception tracebacks, and dynamically routes critical errors to isolated, project-specific log files.
-* **Zero-Cost Context Compiler:** Instantly packages entire repository architectures into a sanitized, LLM-ready Markdown payload while actively blocking heavy virtual environments, `.git` folders, and binary databases.
-* **API-First Backend (FastAPI):** A robust backend utilizing Pydantic for strict payload validation and lifespan context managers for memory-safe startup and shutdown sequences.
+* **Zero-Trust DevSecOps Pipeline:** Enforces cryptographic path jailing to prevent directory traversal, global HTTP error masking to prevent stack-trace leaks, and an aggressive **Halt-and-Catch-Fire (HCF)** secret scanner that instantly aborts operations if hardcoded credentials are detected.
+* **Hardware-Aware Graceful Degradation:** Integrates OS-level `psutil` circuit breakers. If system RAM or compute pressure reaches critical thresholds, the API rejects AI routing requests with a 503, protecting the host machine from out-of-memory driver crashes.
+* **RAM-Bound Ephemeral Vector State:** Utilizes a completely in-memory ChromaDB instance to track current debugging sessions. This prevents cross-session state leakage and eliminates disk I/O bottlenecks when the 70B architectural model detects logic loops.
+* **Prompt Injection Fencing:** Untrusted user code and Git diffs are strictly wrapped in neutralized XML tags before being passed to local models, neutralizing injection escape attempts.
+* **Zero-Cost Context Compiler:** Instantly packages entire repository architectures into a sanitized, LLM-ready Markdown payload while actively blocking heavy virtual environments, binary databases (`.sqlite3`), and `.git` folders.
+* **Hardware-Decoupled Native UI (PySide6):** A multi-threaded dashboard running entirely on software rendering. This explicitly decouples the UI from the GPU, maintaining a fluid interface even when local LLMs max out hardware compute.
 
 ## 🛠️ Tech Stack
 
 * **Frontend:** PySide6 (Qt for Python)
-* **Backend:** FastAPI, Uvicorn, Pydantic
-* **AI Engine:** Ollama (Llama 3.1 8B)
-* **Version Control:** GitPython
-* **Concurrency:** QThread (UI), Subprocess (Telemetry), Asyncio (API)
+* **Backend:** FastAPI, Uvicorn, Pydantic-Settings
+* **AI & State:** Ollama (Llama 3.1 8B, Llama 3.3 70B), ChromaDB Ephemeral
+* **Concurrency & I/O:** AnyIO (Async Threading), QThread, Subprocess
+* **Observability:** Structlog (JSON Structured Logging)
+* **DevSecOps:** Docker (Least-Privilege Containerization), Pytest-Asyncio
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-* Python 3.10+
+* Python 3.13+
 * [Ollama](https://ollama.com/) installed and running locally.
-* The `llama3.1` model pulled via Ollama (`ollama pull llama3.1`).
+* Required Local Models: 
+  * `ollama pull llama3.1` (Rapid commit generation)
+  * `ollama pull llama3.3:70b` (Deep architectural review)
+  * `ollama pull nomic-embed-text` (Vector embedding)
 
-### Installation
+### 1. Installation
 
-1. **Clone the repository:**
-   ```bash
-   git clone [https://github.com/Mar346k/ai-dev-daemon.git](https://github.com/Mar346k/ai-dev-daemon.git)
-   cd ai-dev-daemon
-   ```
-   
-2. Set up the environment:
-   ```bash
-   python -m venv .venv
-   source .venv/Scripts/activate  # Windows
-   ```
-3. Install dependencies:
-   ```bash
-   pip install -r backend/requirements.txt
-   pip install -r frontend/requirements.txt
-   ```
+Clone the repository and set up your virtual environment:
+```bash
+git clone [https://github.com/Mar346k/ai-dev-daemon.git](https://github.com/Mar346k/ai-dev-daemon.git)
+cd ai-dev-daemon
 
-Execution
+python -m venv .venv
+source .venv/Scripts/activate  # Windows: .venv\Scripts\activate
+```
+Install both backend and frontend dependencies:
+
+```Bash
+pip install -r backend/requirements.txt
+pip install -r frontend/requirements.txt
+```
+
+### 2. Configuration & Security
+The daemon utilizes strict path jailing. You must define your authorized workspace, or the API will block all file access.
+
+Create a .env file inside the backend/ directory:
+
+```Bash
+# backend/.env
+DAEMON_WORKSPACE=C:\Path\To\Your\Projects
+```
+
+### 3. Execution
 The system requires both the backend API and the frontend UI to be running simultaneously.
 
-1. Start the AI Backend:
-   Open a terminal, activate your environment, and run:
+* Start the AI Backend:
+Open a terminal, activate your environment, and run the ASGI server:
 
-   ```Bash
-   cd backend
-   uvicorn app.main:app --host 127.0.0.1 --port 8000
-   ```
-2. Launch the Control Center:
-   Open a second terminal, activate your environment, and run:
+```Bash
+cd backend
+uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
 
-   ```Bash
-   cd frontend
-   python main.py
-   ```
-   
-🔒 Security Note
-This system performs automated pre-staging DevSecOps checks. It actively scans diffs using regex patterns to redact potential API keys and secrets before they are ever processed by the AI or committed to local history.
+* Launch the Control Center:
+Open a second terminal, activate your environment, and launch the PySide6 dashboard:
+
+```Bash
+cd frontend
+python main.py
+```
+
+🔒 Security Posture
+This system operates under a strict Halt-and-Catch-Fire security protocol. Unlike legacy tools that silently mutate or redact code, if this daemon detects a leaked API key or secret in your Git diff, the entire pipeline violently aborts, throws a 400 Bad Request, and refuses to stage the commit. This forces developers to utilize environment variables rather than relying on automated redaction safety nets.

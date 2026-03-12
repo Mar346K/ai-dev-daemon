@@ -17,7 +17,7 @@ class ContextCompiler:
             "chroma_data", ".pytest_cache", "node_modules"
         }
         self.exclude_exts = {
-            ".pyc", ".db", ".exe", ".dll", ".so", ".md", ".log"
+            ".pyc", ".db", ".sqlite3", ".exe", ".dll", ".so", ".md", ".log"
         }
 
     def _generate_tree(self, directory: Path, prefix: str = "") -> str:

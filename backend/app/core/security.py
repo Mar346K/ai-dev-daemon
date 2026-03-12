@@ -1,8 +1,11 @@
+# Add anyio to your imports at the top
 import os
 import re
+import anyio
 from pathlib import Path
 from fastapi import HTTPException
-from app.core.config import get_settings # <-- Add this import
+from app.core.config import get_settings
+from functools import partial
 
 # DELTE THIS LINE: WORKSPACE_ROOT = Path(os.getenv("DAEMON_WORKSPACE", Path.home())).resolve()
 
@@ -31,14 +34,17 @@ SECRET_PATTERNS = [
     (r"sk-[a-zA-Z0-9]{32,}", "OPENAI_API_KEY"),
     (r"(?i)(?:api_key|secret|token)[\s:=]+['\"]([a-zA-Z0-9_\-]{16,})['\"]", "GENERIC_API_KEY")
 ]
-
-def scan_file_for_secrets(file_path: Path) -> None:
+# CHANGE to async def
+async def scan_file_for_secrets(file_path: Path) -> None:
     """
-    Scans a file for hardcoded secrets. 
+    Scans a file for hardcoded secrets asynchronously. 
     Implements Halt-and-Catch-Fire: instantly raises an HTTPException if a secret is found.
     """
     try:
-        content = file_path.read_text(encoding="utf-8")
+        # Offload the blocking disk read to a worker thread
+        # FIX: Use partial to bundle the keyword argument before handing it to anyio
+        read_func = partial(file_path.read_text, encoding="utf-8")
+        content = await anyio.to_thread.run_sync(read_func)
         
         for pattern, key_name in SECRET_PATTERNS:
             if re.search(pattern, content):

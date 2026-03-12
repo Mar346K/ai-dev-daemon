@@ -155,9 +155,8 @@ def test_cryptographic_air_gap_indicator(qtbot, monkeypatch):
     window = AIDevDashboard()
     qtbot.addWidget(window)
     
-    # 1. Simulate a successful health ping from the backend
-    mock_data = {"status": "healthy"}
-    window._on_health_success(mock_data)
+    # 1. Simulate a successful health ping using the new strict C++ typing
+    window._on_health_success(True, "healthy")
     
     # 2. Verify the Status Bar was updated with the security indicators
     status_text = window.statusBar().currentMessage()

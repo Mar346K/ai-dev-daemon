@@ -2,7 +2,8 @@ import sys
 import os
 import json
 import hashlib
-from PySide6.QtGui import QCloseEvent
+from PySide6.QtGui import QCloseEvent  # <-- ADD THIS LINE BACK
+from PySide6.QtCore import QTimer, Qt, QThread, Signal, Slot
 
 # Professional Standard: Decouple PySide6 rendering from the GPU.
 # This makes the UI immune to driver resets when Ollama spikes the VRAM.
@@ -22,7 +23,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import QTimer, Qt, QThread, Signal
 
 class APIWorker(QThread):
-    success_signal = Signal(dict)
+    # === UPGRADE 3.1: Strict C++ Boundary Typing ===
+    success_signal = Signal(bool, str)
     error_signal = Signal(str)
 
     def __init__(self, url: str, method: str = "GET", payload: dict | None = None):
@@ -32,11 +34,6 @@ class APIWorker(QThread):
         self.payload = payload or {}
 
     def _get_ipc_token(self) -> str:
-        """
-        Securely resolves the backend's hidden IPC token file.
-        Returns the token string, or an empty string if not yet initialized.
-        """
-        # Resolve the path relative to this frontend script (../backend/.daemon_token)
         token_path = Path(__file__).resolve().parent.parent / "backend" / ".daemon_token"
         try:
             if token_path.exists():
@@ -47,17 +44,18 @@ class APIWorker(QThread):
 
     def run(self) -> None:
         try:
-            # === UPGRADE 2.1: Ephemeral IPC Bearer Authentication ===
             headers = {"Authorization": f"Bearer {self._get_ipc_token()}"}
-            # ========================================================
-            
             with httpx.Client(timeout=90.0) as client: 
                 if self.method == "GET":
                     response = client.get(self.url, headers=headers)
                 elif self.method == "POST":
                     response = client.post(self.url, json=self.payload, headers=headers)
                 response.raise_for_status()
-                self.success_signal.emit(response.json())
+                
+                # Extract relevant string data to safely pass across the C++ boundary
+                data = response.json()
+                msg = data.get("message", data.get("status", "success"))
+                self.success_signal.emit(True, str(msg))
                 
         except httpx.HTTPStatusError as exc:
             err_detail = exc.response.json().get("detail", str(exc))
@@ -257,17 +255,15 @@ class AIDevDashboard(QMainWindow):
         self.health_worker.error_signal.connect(self._on_health_error)
         self.health_worker.start()
 
-    def _on_health_success(self, data: dict) -> None:
-        if data.get("status") == "healthy":
+    @Slot(bool, str)
+    def _on_health_success(self, status: bool, message: str) -> None:
+        if status and message == "healthy":
             self.lbl_status.setText("Backend Status: 🟢 CONNECTED")
-            
-            # === UPGRADE 2.2: Cryptographic Air-Gap Indicator ===
-            # Generate a short SHA-256 hash of the active workspace path
             workspace = self.txt_project_path.text()
             workspace_hash = hashlib.sha256(workspace.encode("utf-8")).hexdigest()[:12]
             self.status_bar.showMessage(f"🔒 Workspace Hash: {workspace_hash} | Air-Gap: SECURE")
-            # ====================================================
             
+    @Slot(str)
     def _on_health_error(self, error_msg: str) -> None:
         self.lbl_status.setText("Backend Status: 🔴 OFFLINE")
 
@@ -287,10 +283,12 @@ class AIDevDashboard(QMainWindow):
         self.compile_worker.error_signal.connect(self._on_compile_error)
         self.compile_worker.start()
 
-    def _on_compile_success(self, data: dict) -> None:
-        self.log_viewer.append(f"[SUCCESS] {data.get('message')}")
+    @Slot(bool, str)
+    def _on_compile_success(self, status: bool, message: str) -> None:
+        self.log_viewer.append(f"[SUCCESS] {message}")
         self.btn_compile_context.setEnabled(True)
 
+    @Slot(str)
     def _on_compile_error(self, error_msg: str) -> None:
         self.log_viewer.append(f"[ERROR] Context compilation failed: {error_msg}")
         self.btn_compile_context.setEnabled(True)
@@ -377,10 +375,12 @@ class AIDevDashboard(QMainWindow):
         self.commit_worker.error_signal.connect(self._on_commit_error)
         self.commit_worker.start()
 
-    def _on_commit_success(self, data: dict) -> None:
-        self.log_viewer.append(f"[SUCCESS] {data.get('message')}")
+    @Slot(bool, str)
+    def _on_commit_success(self, status: bool, message: str) -> None:
+        self.log_viewer.append(f"[SUCCESS] {message}")
         self.btn_manual_commit.setEnabled(True)
         
+    @Slot(str)
     def _on_commit_error(self, error_msg: str) -> None:
         self.log_viewer.append(f"[ERROR] Manual commit failed: {error_msg}")
         self.btn_manual_commit.setEnabled(True)

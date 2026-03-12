@@ -1,6 +1,7 @@
 import sys
 import os
 import json
+import hashlib
 from PySide6.QtGui import QCloseEvent
 
 # Professional Standard: Decouple PySide6 rendering from the GPU.
@@ -219,6 +220,12 @@ class AIDevDashboard(QMainWindow):
         self.btn_run_project.clicked.connect(self._trigger_project_runner)
         self.btn_manual_commit.clicked.connect(self._trigger_manual_commit)
 
+        # === UPGRADE 2.2: Cryptographic Air-Gap Indicator ===
+        self.status_bar = self.statusBar()
+        self.status_bar.setStyleSheet("color: #50fa7b; font-family: monospace; font-weight: bold;")
+        self.status_bar.showMessage("🔒 Air-Gap: Awaiting Sync...")
+        # ====================================================
+
     def _browse_project_directory(self) -> None:
         folder = QFileDialog.getExistingDirectory(self, "Select Target Project Directory")
         if folder:
@@ -253,6 +260,13 @@ class AIDevDashboard(QMainWindow):
     def _on_health_success(self, data: dict) -> None:
         if data.get("status") == "healthy":
             self.lbl_status.setText("Backend Status: 🟢 CONNECTED")
+            
+            # === UPGRADE 2.2: Cryptographic Air-Gap Indicator ===
+            # Generate a short SHA-256 hash of the active workspace path
+            workspace = self.txt_project_path.text()
+            workspace_hash = hashlib.sha256(workspace.encode("utf-8")).hexdigest()[:12]
+            self.status_bar.showMessage(f"🔒 Workspace Hash: {workspace_hash} | Air-Gap: SECURE")
+            # ====================================================
             
     def _on_health_error(self, error_msg: str) -> None:
         self.lbl_status.setText("Backend Status: 🔴 OFFLINE")

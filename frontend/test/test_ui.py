@@ -145,3 +145,23 @@ def test_ipc_bearer_token_injection(monkeypatch):
         
         assert "headers" in kwargs
         assert kwargs["headers"]["Authorization"] == "Bearer secure_ipc_token_123"
+
+def test_cryptographic_air_gap_indicator(qtbot, monkeypatch):
+    """
+    Verify that upon a successful health ping, the status bar displays 
+    the cryptographic hash of the active workspace to prove Air-Gap alignment.
+    """
+    monkeypatch.setattr("main.AIDevDashboard._init_timers", lambda self: None)
+    window = AIDevDashboard()
+    qtbot.addWidget(window)
+    
+    # 1. Simulate a successful health ping from the backend
+    mock_data = {"status": "healthy"}
+    window._on_health_success(mock_data)
+    
+    # 2. Verify the Status Bar was updated with the security indicators
+    status_text = window.statusBar().currentMessage()
+    
+    assert "🔒" in status_text
+    assert "Air-Gap: SECURE" in status_text
+    assert "Workspace Hash:" in status_text

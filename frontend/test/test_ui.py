@@ -164,3 +164,34 @@ def test_cryptographic_air_gap_indicator(qtbot, monkeypatch):
     assert "🔒" in status_text
     assert "Air-Gap: SECURE" in status_text
     assert "Workspace Hash:" in status_text
+
+def test_deterministic_ui_state_machine(qtbot, monkeypatch):
+    """
+    Verify that the UI strictly adheres to defined states, 
+    disabling critical action buttons when the system is BUSY to prevent race conditions.
+    """
+    monkeypatch.setattr("main.AIDevDashboard._init_timers", lambda self: None)
+    window = AIDevDashboard()
+    qtbot.addWidget(window)
+    
+    from main import UIState
+    
+    # 1. Base State: IDLE
+    assert window.current_state == UIState.IDLE
+    assert window.btn_compile_context.isEnabled() is True
+    assert window.btn_manual_commit.isEnabled() is True
+    
+    # 2. Transition to BUSY
+    window._transition_state(UIState.BUSY_COMPILING)
+    
+    # 3. Mathematical Proof: The UI must be locked down
+    assert window.current_state == UIState.BUSY_COMPILING
+    assert window.btn_compile_context.isEnabled() is False
+    assert window.btn_manual_commit.isEnabled() is False
+    assert window.btn_run_project.isEnabled() is False
+    assert window.btn_browse.isEnabled() is False
+    
+    # 4. Transition back to IDLE
+    window._transition_state(UIState.IDLE)
+    assert window.btn_manual_commit.isEnabled() is True
+    assert window.btn_browse.isEnabled() is True

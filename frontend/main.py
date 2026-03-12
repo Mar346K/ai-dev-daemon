@@ -2,13 +2,22 @@ import sys
 import os
 import json
 import hashlib
-from PySide6.QtGui import QCloseEvent  # <-- ADD THIS LINE BACK
+from enum import Enum, auto
+from PySide6.QtGui import QCloseEvent  
 from PySide6.QtCore import QTimer, Qt, QThread, Signal, Slot
 
 # Professional Standard: Decouple PySide6 rendering from the GPU.
 # This makes the UI immune to driver resets when Ollama spikes the VRAM.
 os.environ["QT_OPENGL"] = "software"
 os.environ["QT_QUICK_BACKEND"] = "software"
+
+# === UPGRADE 3.2: Deterministic UI State Machine ===
+class UIState(Enum):
+    IDLE = auto()
+    BUSY_COMPILING = auto()
+    BUSY_COMMITTING = auto()
+    BUSY_RUNNING = auto()
+# ===================================================
 
 import subprocess
 import re
@@ -136,7 +145,10 @@ class AIDevDashboard(QMainWindow):
         self.session_start_time = datetime.now(timezone.utc)
         self.api_url = "http://localhost:8000"
         
-        # Professional Standard: Permanent resident workers to prevent Garbage Collection
+        # Initialize UI State Machine
+        self.current_state = UIState.IDLE
+        
+        # Professional Standard: Permanent resident workers
         self.commit_worker = None
         self.compile_worker = None
         self.project_worker = None
@@ -144,6 +156,18 @@ class AIDevDashboard(QMainWindow):
 
         self._init_ui()
         self._init_timers()
+
+    # === UPGRADE 3.2: Centralized State Mutator ===
+    def _transition_state(self, new_state: UIState) -> None:
+        """Single source of truth for UI mutability to prevent race conditions."""
+        self.current_state = new_state
+        is_idle = (new_state == UIState.IDLE)
+        
+        self.btn_compile_context.setEnabled(is_idle)
+        self.btn_run_project.setEnabled(is_idle)
+        self.btn_manual_commit.setEnabled(is_idle)
+        self.btn_browse.setEnabled(is_idle)
+    # ==============================================
 
     def _init_ui(self) -> None:
         central_widget = QWidget()
@@ -268,13 +292,13 @@ class AIDevDashboard(QMainWindow):
         self.lbl_status.setText("Backend Status: 🔴 OFFLINE")
 
     def _trigger_context_compile(self) -> None:
-        if self.compile_worker and self.compile_worker.isRunning():
-            self.log_viewer.append("⚠️ [BUSY] Context compiler is already running.")
+        if self.current_state != UIState.IDLE:
+            self.log_viewer.append("⚠️ [BUSY] System is currently locked. Please wait.")
             return
 
+        self._transition_state(UIState.BUSY_COMPILING)
         target_path = self.txt_project_path.text()
         self.log_viewer.append(f">>> Compiling repository context for '{Path(target_path).name}'... Please wait.")
-        self.btn_compile_context.setEnabled(False) 
         
         payload = {"project_path": target_path}
         self.compile_worker = APIWorker(f"{self.api_url}/compile-context", method="POST", payload=payload)
@@ -286,16 +310,16 @@ class AIDevDashboard(QMainWindow):
     @Slot(bool, str)
     def _on_compile_success(self, status: bool, message: str) -> None:
         self.log_viewer.append(f"[SUCCESS] {message}")
-        self.btn_compile_context.setEnabled(True)
+        self._transition_state(UIState.IDLE)
 
     @Slot(str)
     def _on_compile_error(self, error_msg: str) -> None:
         self.log_viewer.append(f"[ERROR] Context compilation failed: {error_msg}")
-        self.btn_compile_context.setEnabled(True)
+        self._transition_state(UIState.IDLE)
 
     def _trigger_project_runner(self) -> None:
-        if self.project_worker and self.project_worker.isRunning():
-            self.log_viewer.append("⚠️ [BUSY] A project is already running. Please close it first.")
+        if self.current_state != UIState.IDLE:
+            self.log_viewer.append("⚠️ [BUSY] System is currently locked. Please wait.")
             return
 
         target_dir = self.txt_project_path.text()
@@ -306,12 +330,18 @@ class AIDevDashboard(QMainWindow):
         if not script_file:
             return 
             
+        self._transition_state(UIState.BUSY_RUNNING)
         script_path = Path(script_file)
         self.log_viewer.append(f">>> Initializing project runner for '{script_path.name}'...")
         
         self.project_worker = ProjectRunnerWorker(str(script_path))
         self.project_worker.setParent(self)
         self.project_worker.log_signal.connect(self._on_project_log)
+        
+        # We need to hook up a way to transition back to IDLE when the script finishes.
+        # For now, we will add a finished signal hook:
+        self.project_worker.finished.connect(lambda: self._transition_state(UIState.IDLE))
+        
         self.project_worker.start()
 
     def _on_project_log(self, log_entry: str) -> None:
@@ -357,14 +387,13 @@ class AIDevDashboard(QMainWindow):
                     pass
 
     def _trigger_manual_commit(self) -> None:
-        """Triggers the backend API with the Persistent Resident Anchor."""
-        if self.commit_worker and self.commit_worker.isRunning():
-            self.log_viewer.append("⚠️ [BUSY] AI is already processing a commit. Please wait.")
+        if self.current_state != UIState.IDLE:
+            self.log_viewer.append("⚠️ [BUSY] System is currently locked. Please wait.")
             return
 
+        self._transition_state(UIState.BUSY_COMMITTING)
         target_path = self.txt_project_path.text()
         self.log_viewer.append(f">>> Analyzing diffs with 8B Model... (Hardware spooling detected)")
-        self.btn_manual_commit.setEnabled(False) 
         
         payload = {"project_path": target_path}
         
@@ -378,12 +407,12 @@ class AIDevDashboard(QMainWindow):
     @Slot(bool, str)
     def _on_commit_success(self, status: bool, message: str) -> None:
         self.log_viewer.append(f"[SUCCESS] {message}")
-        self.btn_manual_commit.setEnabled(True)
+        self._transition_state(UIState.IDLE)
         
     @Slot(str)
     def _on_commit_error(self, error_msg: str) -> None:
         self.log_viewer.append(f"[ERROR] Manual commit failed: {error_msg}")
-        self.btn_manual_commit.setEnabled(True)
+        self._transition_state(UIState.IDLE)
 
     def closeEvent(self, event: QCloseEvent) -> None:
         """

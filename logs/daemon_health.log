@@ -37,3 +37,236 @@ This message briefly explains the purpose of the changes, making it easy for oth
 2026-03-05 12:23:38,161 - INFO - [main.py:62] - Received request to force commit for: C:\AI\ai_dev_daemon
 2026-03-05 12:24:41,868 - INFO - [main.py:71] - Commit generated: Refactored API worker management for improved thread anchoring and error handling.
 2026-03-05 12:26:35,946 - INFO - [main.py:62] - Received request to force commit for: C:\AI\ai_dev_daemon
+2026-03-05 12:26:50,479 - INFO - [main.py:71] - Commit generated: Refactored API worker management for improved thread anchoring and error handling.
+2026-03-05 16:01:51,395 - INFO - [main.py:37] - Received request to compile context for: C:\AI\ai_dev_daemon
+2026-03-05 16:01:51,543 - INFO - [main.py:46] - Context compiled successfully: llm_context_dump.md
+2026-03-07 12:44:38,383 - INFO - [main.py:62] - Received request to force commit for: C:\AI\Sovereign_Author_Suite
+2026-03-07 12:46:12,168 - INFO - [main.py:71] - Commit generated: Error querying llama3.1:latest: timed out
+2026-03-08 09:39:58,624 - INFO - [main.py:37] - Received request to compile context for: C:\AI\SovereignSearch-Forensics
+2026-03-08 09:40:00,932 - INFO - [main.py:46] - Context compiled successfully: llm_context_dump.md
+2026-03-08 09:57:16,307 - INFO - [main.py:62] - Received request to force commit for: C:\AI\SovereignSearch-Forensics
+2026-03-08 09:57:55,362 - INFO - [main.py:71] - Commit generated: Added centralized configuration management with pydantic models and initialized global settings instance
+2026-03-08 09:59:12,150 - INFO - [main.py:62] - Received request to force commit for: C:\AI\SovereignSearch-Forensics
+2026-03-08 09:59:34,617 - INFO - [main.py:71] - Commit generated: Added database utilities and schema initialization for SQLite database.
+2026-03-08 10:01:39,661 - INFO - [main.py:62] - Received request to force commit for: C:\AI\SovereignSearch-Forensics
+2026-03-08 10:02:03,353 - INFO - [main.py:71] - Commit generated: Added Chroma vector database client and local LLM initialization functionality
+2026-03-08 10:51:29,326 - INFO - [main.py:62] - Received request to force commit for: C:\AI\SovereignSearch-Forensics
+2026-03-08 10:52:17,633 - INFO - [main.py:71] - Commit generated: Added file management and sanitization utilities
+2026-03-08 11:21:01,499 - INFO - [main.py:62] - Received request to force commit for: C:\AI\SovereignSearch-Forensics
+2026-03-08 11:22:01,396 - INFO - [main.py:71] - Commit generated: Implemented frontend components for live intelligence querying, document ingestion, and forensic assembly
+2026-03-08 11:31:45,007 - INFO - [main.py:62] - Received request to force commit for: C:\AI\SovereignSearch-Forensics
+2026-03-08 11:32:00,194 - INFO - [main.py:71] - Commit generated: Updated 01_START_VAULT.bat to run frontend/app.py instead of vault.py.
+2026-03-08 11:43:26,578 - INFO - [main.py:62] - Received request to force commit for: C:\AI\SovereignSearch-Forensics
+2026-03-08 11:43:26,719 - INFO - [main.py:71] - Commit generated: No changes detected to commit.
+2026-03-08 11:59:39,670 - INFO - [main.py:62] - Received request to force commit for: C:\AI\SovereignSearch-Forensics
+2026-03-08 12:00:05,999 - INFO - [main.py:71] - Commit generated: Initialized Docker configuration for Streamlit app.
+2026-03-08 12:12:20,145 - INFO - [main.py:62] - Received request to force commit for: C:\AI\SovereignSearch-Forensics
+2026-03-08 12:13:12,043 - INFO - [main.py:71] - Commit generated: Updated documentation and added Docker support for air-gapped environment.
+2026-03-08 14:43:19,544 - INFO - [main.py:37] - Received request to compile context for: C:\AI\SovereignSearch-Forensics
+2026-03-08 14:43:22,090 - INFO - [main.py:46] - Context compiled successfully: llm_context_dump.md
+2026-03-09 10:56:05,937 - INFO - [main.py:62] - Received request to force commit for: C:\AI\SovereignSearch-Forensics
+2026-03-09 10:57:38,493 - INFO - [main.py:71] - Commit generated: Error querying llama3.1:latest: timed out
+2026-03-09 10:58:33,829 - INFO - [main.py:62] - Received request to force commit for: C:\AI\SovereignSearch-Forensics
+2026-03-09 10:58:34,095 - INFO - [main.py:71] - Commit generated: No changes detected to commit.
+2026-03-09 11:25:04,137 - INFO - [main.py:37] - Received request to compile context for: C:\AI\nexusrisk
+2026-03-09 11:25:04,637 - INFO - [main.py:46] - Context compiled successfully: llm_context_dump.md
+2026-03-09 12:40:47,364 - INFO - [main.py:62] - Received request to force commit for: C:\AI\nexusrisk
+2026-03-09 12:42:23,653 - INFO - [main.py:71] - Commit generated: Error querying llama3.1:latest: timed out
+2026-03-09 12:43:36,272 - INFO - [main.py:62] - Received request to force commit for: C:\AI\nexusrisk
+2026-03-09 12:43:36,485 - INFO - [main.py:71] - Commit generated: No changes detected to commit.
+2026-03-09 12:44:15,384 - INFO - [main.py:62] - Received request to force commit for: C:\AI\nexusrisk
+2026-03-09 12:45:48,248 - INFO - [main.py:71] - Commit generated: Error querying llama3.1:latest: timed out
+2026-03-09 12:45:52,809 - INFO - [main.py:62] - Received request to force commit for: C:\AI\nexusrisk
+2026-03-09 12:45:53,019 - INFO - [main.py:71] - Commit generated: No changes detected to commit.
+2026-03-09 12:52:27,722 - INFO - [main.py:62] - Received request to force commit for: C:\AI\nexusrisk
+2026-03-09 12:52:27,841 - INFO - [main.py:71] - Commit generated: No changes detected to commit.
+2026-03-09 15:50:20,103 - INFO - [main.py:62] - Received request to force commit for: C:\AI\nexusrisk
+2026-03-09 15:50:20,341 - ERROR - [main.py:77] - Commit failed: Cmd('git') failed due to: exit code(1)
+  cmdline: git add output/nexusrisk_context.md
+  stderr: 'The following paths are ignored by one of your .gitignore files:
+output
+hint: Use -f if you really want to add them.
+hint: Disable this message with "git config advice.addIgnoredFile false"'
+Traceback (most recent call last):
+  File "C:\AI\ai_dev_daemon\backend\app\main.py", line 69, in force_commit
+    commit_msg = git_mgr.force_ai_commit()
+  File "C:\AI\ai_dev_daemon\backend\app\core\git_manager.py", line 46, in force_ai_commit
+    self.process_and_stage_changes()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\AI\ai_dev_daemon\backend\app\core\git_manager.py", line 37, in process_and_stage_changes
+    self.repo.git.add(file_str)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\AI\ai_dev_daemon\backend\.venv\Lib\site-packages\git\cmd.py", line 800, in <lambda>
+    return lambda *args, **kwargs: self._call_process(name, *args, **kwargs)
+                                   ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\AI\ai_dev_daemon\backend\.venv\Lib\site-packages\git\cmd.py", line 1386, in _call_process
+    return self.execute(call, **exec_kwargs)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "C:\AI\ai_dev_daemon\backend\.venv\Lib\site-packages\git\cmd.py", line 1183, in execute
+    raise GitCommandError(redacted_command, status, stderr_value, stdout_value)
+git.exc.GitCommandError: Cmd('git') failed due to: exit code(1)
+  cmdline: git add output/nexusrisk_context.md
+  stderr: 'The following paths are ignored by one of your .gitignore files:
+output
+hint: Use -f if you really want to add them.
+hint: Disable this message with "git config advice.addIgnoredFile false"'
+2026-03-09 15:56:58,277 - INFO - [main.py:62] - Received request to force commit for: C:\AI\nexusrisk
+2026-03-09 15:58:30,869 - INFO - [main.py:71] - Commit generated: Error querying llama3.1:latest: timed out
+2026-03-10 00:19:57,845 - INFO - [main.py:62] - Received request to force commit for: C:\AI\nexusrisk
+2026-03-10 00:19:58,120 - ERROR - [main.py:77] - Commit failed: Cmd('git') failed due to: exit code(1)
+  cmdline: git add output/nexusrisk_context.md
+  stderr: 'The following paths are ignored by one of your .gitignore files:
+output
+hint: Use -f if you really want to add them.
+hint: Disable this message with "git config advice.addIgnoredFile false"'
+Traceback (most recent call last):
+  File "C:\AI\ai_dev_daemon\backend\app\main.py", line 69, in force_commit
+    commit_msg = git_mgr.force_ai_commit()
+  File "C:\AI\ai_dev_daemon\backend\app\core\git_manager.py", line 46, in force_ai_commit
+    self.process_and_stage_changes()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\AI\ai_dev_daemon\backend\app\core\git_manager.py", line 37, in process_and_stage_changes
+    self.repo.git.add(file_str)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\AI\ai_dev_daemon\backend\.venv\Lib\site-packages\git\cmd.py", line 800, in <lambda>
+    return lambda *args, **kwargs: self._call_process(name, *args, **kwargs)
+                                   ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\AI\ai_dev_daemon\backend\.venv\Lib\site-packages\git\cmd.py", line 1386, in _call_process
+    return self.execute(call, **exec_kwargs)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "C:\AI\ai_dev_daemon\backend\.venv\Lib\site-packages\git\cmd.py", line 1183, in execute
+    raise GitCommandError(redacted_command, status, stderr_value, stdout_value)
+git.exc.GitCommandError: Cmd('git') failed due to: exit code(1)
+  cmdline: git add output/nexusrisk_context.md
+  stderr: 'The following paths are ignored by one of your .gitignore files:
+output
+hint: Use -f if you really want to add them.
+hint: Disable this message with "git config advice.addIgnoredFile false"'
+2026-03-10 00:20:40,349 - INFO - [main.py:62] - Received request to force commit for: C:\AI\nexusrisk
+2026-03-10 00:22:12,856 - INFO - [main.py:71] - Commit generated: Error querying llama3.1:latest: timed out
+2026-03-11 19:29:04,695 - ERROR - [main.py:28] - Unhandled exception on http://testserver/compile-context: CRITICAL LEAK: Database password is 'hunter2'
+Traceback (most recent call last):
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\routing.py", line 758, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\routing.py", line 778, in app
+    await route.handle(scope, receive, send)
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\routing.py", line 299, in handle
+    await self.app(scope, receive, send)
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\routing.py", line 79, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\routing.py", line 74, in app
+    response = await func(request)
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\fastapi\routing.py", line 299, in app
+    raise e
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\fastapi\routing.py", line 294, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        dependant=dependant, values=values, is_coroutine=is_coroutine
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\fastapi\routing.py", line 191, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\AI\ai_dev_daemon\backend\app\main.py", line 48, in compile_context
+    target_dir = secure_resolve_path(request.project_path)
+  File "C:\AI\ai_dev_daemon\backend\app\test\test_main.py", line 22, in mock_crash
+    raise RuntimeError("CRITICAL LEAK: Database password is 'hunter2'")
+RuntimeError: CRITICAL LEAK: Database password is 'hunter2'
+2026-03-11 19:31:16,890 - ERROR - [main.py:28] - Unhandled exception on http://testserver/compile-context: CRITICAL LEAK: Database password is 'hunter2'
+Traceback (most recent call last):
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\routing.py", line 758, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\routing.py", line 778, in app
+    await route.handle(scope, receive, send)
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\routing.py", line 299, in handle
+    await self.app(scope, receive, send)
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\routing.py", line 79, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\routing.py", line 74, in app
+    response = await func(request)
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\fastapi\routing.py", line 299, in app
+    raise e
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\fastapi\routing.py", line 294, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        dependant=dependant, values=values, is_coroutine=is_coroutine
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\fastapi\routing.py", line 191, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\AI\ai_dev_daemon\backend\app\main.py", line 48, in compile_context
+    target_dir = secure_resolve_path(request.project_path)
+  File "C:\AI\ai_dev_daemon\backend\app\test\test_main.py", line 22, in mock_crash
+    raise RuntimeError("CRITICAL LEAK: Database password is 'hunter2'")
+RuntimeError: CRITICAL LEAK: Database password is 'hunter2'
+2026-03-11 19:39:51,190 - ERROR - [main.py:28] - Unhandled exception on http://testserver/compile-context: CRITICAL LEAK: Database password is 'hunter2'
+Traceback (most recent call last):
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\routing.py", line 758, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\routing.py", line 778, in app
+    await route.handle(scope, receive, send)
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\routing.py", line 299, in handle
+    await self.app(scope, receive, send)
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\routing.py", line 79, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\starlette\routing.py", line 74, in app
+    response = await func(request)
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\fastapi\routing.py", line 299, in app
+    raise e
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\fastapi\routing.py", line 294, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        dependant=dependant, values=values, is_coroutine=is_coroutine
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\AI\ai_dev_daemon\backend\venv\Lib\site-packages\fastapi\routing.py", line 191, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\AI\ai_dev_daemon\backend\app\main.py", line 48, in compile_context
+    target_dir = secure_resolve_path(request.project_path)
+  File "C:\AI\ai_dev_daemon\backend\app\test\test_main.py", line 22, in mock_crash
+    raise RuntimeError("CRITICAL LEAK: Database password is 'hunter2'")
+RuntimeError: CRITICAL LEAK: Database password is 'hunter2'

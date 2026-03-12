@@ -2,24 +2,30 @@ import pytest
 import os
 from pathlib import Path
 from fastapi import HTTPException
-from app.core.security import secure_resolve_path, WORKSPACE_ROOT
+from app.core.config import get_settings # <-- Add this import
+# REMOVE WORKSPACE_ROOT from the import below
+from app.core.security import secure_resolve_path
 
 def test_secure_resolve_valid_path():
     """Verify that a project path within the designated workspace is allowed."""
-    valid_path = WORKSPACE_ROOT / "my_valid_project"
+    settings = get_settings()
+    valid_path = settings.daemon_workspace / "my_valid_project"
     resolved = secure_resolve_path(str(valid_path))
     assert resolved == valid_path.resolve()
 
 def test_secure_resolve_path_traversal():
     """Verify that attempting to traverse outside the workspace raises a 403 HTTPException."""
+    settings = get_settings()
     # Force a path that attempts to go up one level from the workspace root
-    escape_path = WORKSPACE_ROOT.parent / "forbidden_system_dir"
+    escape_path = settings.daemon_workspace.parent / "forbidden_system_dir"
     
     with pytest.raises(HTTPException) as exc_info:
         secure_resolve_path(str(escape_path))
         
     assert exc_info.value.status_code == 403
     assert "Path traversal blocked" in exc_info.value.detail
+
+# ... (leave the rest of the file unchanged)
 
 def test_scan_for_secrets_clean_file(tmp_path):
     """Verify that a file without secrets passes the scan silently."""

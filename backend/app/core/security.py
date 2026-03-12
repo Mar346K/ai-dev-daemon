@@ -2,25 +2,27 @@ import os
 import re
 from pathlib import Path
 from fastapi import HTTPException
+from app.core.config import get_settings # <-- Add this import
 
-# Enforce a strict root directory for all AI operations. 
-# Defaults to the user's home directory unless explicitly overridden.
-WORKSPACE_ROOT = Path(os.getenv("DAEMON_WORKSPACE", Path.home())).resolve()
+# DELTE THIS LINE: WORKSPACE_ROOT = Path(os.getenv("DAEMON_WORKSPACE", Path.home())).resolve()
 
 def secure_resolve_path(requested_path: str) -> Path:
     """
-    Resolves a requested path and ensures it does not escape the WORKSPACE_ROOT.
+    Resolves a requested path and ensures it does not escape the workspace root.
     Fails fast with a 403 if traversal is detected.
     """
+    settings = get_settings()
+    workspace_root = settings.daemon_workspace
     target = Path(requested_path).resolve()
     
-    # Python 3.9+ native method for strict path containment
-    if not target.is_relative_to(WORKSPACE_ROOT):
+    if not target.is_relative_to(workspace_root):
         raise HTTPException(
             status_code=403, 
-            detail=f"Path traversal blocked. Target must be within {WORKSPACE_ROOT}"
+            detail=f"Path traversal blocked. Target must be within {workspace_root}"
         )
     return target
+
+# ... (rest of your existing security.py code remains unchanged)
 
 # ... (rest of your existing security.py code remains unchanged)
 

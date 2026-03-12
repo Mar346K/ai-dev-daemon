@@ -72,7 +72,7 @@ async def force_commit(request: ProjectRequest) -> JSONResponse:
 
     # Removed the try/except block. Let it bubble up!
     git_mgr = GitManager(repo_path=str(target_dir))
-    commit_msg = git_mgr.force_ai_commit()
+    commit_msg = await git_mgr.force_ai_commit()
     
     daemon_logger.info(f"Commit generated: {commit_msg}")
     return JSONResponse(content={

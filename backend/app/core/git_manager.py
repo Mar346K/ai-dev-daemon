@@ -17,35 +17,22 @@ class GitManager:
             
         self.ai_router = AIRouter()
 
-    def process_and_stage_changes(self) -> bool:
-        """
-        Iterates over untracked and modified files, runs the strict security scan,
-        and stages them. Returns True if files were staged.
-        """
-        changed_files = [item.a_path for item in self.repo.index.diff(None)]
-        untracked_files = self.repo.untracked_files
-        
-        all_files_to_process = set(changed_files + untracked_files)
-        
-        if not all_files_to_process:
-            return False
-
+    async def process_and_stage_changes(self) -> bool:
+        # ...
         for file_str in all_files_to_process:
             file_path = self.repo_path / file_str
             if file_path.is_file():
-                # STRICT SCAN: If a secret is found, this raises an HTTPException,
-                # immediately halting the execution before the file can be staged.
-                scan_file_for_secrets(file_path)
+                # MUST AWAIT the new async scanner
+                await scan_file_for_secrets(file_path)
                 self.repo.git.add(file_str)
                 
         return True
 
-    def force_ai_commit(self) -> str:
-        """
-        Forces the pipeline to stage changes, generate an AI commit message 
-        based on the diff, and commit the files.
-        """
-        self.process_and_stage_changes()
+    async def force_ai_commit(self) -> str:
+        # ...
+        # MUST AWAIT the staged changes function
+        await self.process_and_stage_changes()
+        # ... rest remains the same
         
         # Extract the exact code changes that are currently staged
         diff_text = self.repo.git.diff('--cached')

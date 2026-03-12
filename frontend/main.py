@@ -79,16 +79,19 @@ class ProjectRunnerWorker(QThread):
                 line = line.strip()
                 if not line:
                     continue
-                    
-                if self.error_pattern.search(line):
+                
+                # === REFINEMENT: Only tag as CRITICAL if it's NOT JSON ===
+                # If it's JSON, the UI will handle it natively.
+                if not line.startswith("{") and self.error_pattern.search(line):
                     current_time = time.time()
                     if line == self.last_error_msg and (current_time - self.last_error_time) < 2.0:
                         continue
                     self.last_error_msg = line
                     self.last_error_time = current_time
                     self.log_signal.emit(f"⚠️ [CRITICAL] {line}")
-                    
-            self.log_signal.emit(f">>> Target project '{script_path.name}' terminated.")
+                else:
+                    # Pass raw line (JSON or standard output) to the UI
+                    self.log_signal.emit(line)
             
         except Exception as e:
              self.log_signal.emit(f"⚠️ [CRITICAL] Subprocess failed: {e}")
@@ -181,13 +184,18 @@ class AIDevDashboard(QMainWindow):
         self.log_viewer.append(">>> UI Initialized. Awaiting backend connection...")
         main_layout.addWidget(self.log_viewer)
 
-        # Action Buttons
+       # Action Buttons
         bottom_bar = QHBoxLayout()
         self.btn_compile_context = QPushButton("Compile Context (Markdown)")
         self.btn_run_project = QPushButton("Run Active Project (Track Logs)")
         self.btn_manual_commit = QPushButton("Force Manual Commit")
         
-        for btn in [self.btn_compile_context, self.btn_run_project, self.btn_manual_commit]:
+        # --- Add this new button ---
+        self.btn_clear_logs = QPushButton("Clear Logs")
+        self.btn_clear_logs.clicked.connect(self.log_viewer.clear)
+        # ---------------------------
+        
+        for btn in [self.btn_compile_context, self.btn_run_project, self.btn_manual_commit, self.btn_clear_logs]:
             btn.setMinimumHeight(40)
             bottom_bar.addWidget(btn)
             

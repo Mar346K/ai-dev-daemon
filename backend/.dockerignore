@@ -1,0 +1,19 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.env
+
+# Tests
+.pytest_cache/
+
+# Local databases/state
+*.sqlite3
+*.db
+chroma/

@@ -29,7 +29,6 @@ class OllamaEmbeddingAdapter(EmbeddingFunction):
                 response.raise_for_status()
                 embeddings.append(response.json()["embedding"])
         return embeddings
-
 class DualBrainDB:
     """
     Manages the Ephemeral (In-Memory) and Persistent ChromaDB instances.
@@ -41,9 +40,15 @@ class DualBrainDB:
             model_name="nomic-embed-text",
         )
         
-        self.session_client = chromadb.Client(Settings(anonymized_telemetry=False))
+        # THE UPGRADE: Explicitly lock the session client to RAM.
+        # This guarantees zero disk I/O for active session tracking.
+        self.session_client = chromadb.EphemeralClient(
+            settings=Settings(anonymized_telemetry=False)
+        )
         
-        # Professional Standard: Force a clean state to prevent State Leakage
+        # Professional Standard: Force a clean state to prevent State Leakage.
+        # Even in RAM, if the Python process stays alive, we must wipe the 
+        # collection on new instantiation to guarantee a clean context window.
         try:
             self.session_client.delete_collection("active_session")
         except Exception:

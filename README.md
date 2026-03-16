@@ -5,6 +5,8 @@
 
 An enterprise-grade, local DevSecOps daemon designed to actively monitor Python processes, intercept system crashes, and utilize a local LLM to generate real-time root-cause analysis and actionable hotfixes—all within a completely air-gapped, offline environment.
 
+📖 **For a deep dive into the system design, memory management, and zero-trust security boundaries, please read the [ARCHITECTURE.md](./ARCHITECTURE.md).**
+
 ## 🏗️ Architecture Overview
 
 The system is split into a highly optimized PySide6 C++ UI and a high-performance asynchronous FastAPI backend, connected via strict IPC bearer-token authentication.

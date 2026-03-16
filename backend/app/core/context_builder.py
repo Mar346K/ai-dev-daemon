@@ -102,7 +102,7 @@ class ContextCompiler:
         return code_str
 
     def compile(self) -> Path:
-        """Executes the build process and writes the context dump."""
+        """Executes the build process and writes the context dump to the isolated logs directory."""
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
         header = f"# AI Developer Context Dump\n*Generated: {timestamp}*\n\n"
         
@@ -115,7 +115,19 @@ class ContextCompiler:
         code_section += self._gather_code_contents()
         
         full_markdown = header + tree_section + code_section
-        output_file = self.root_path / "llm_context_dump.md"
+        
+        # === V2 UPGRADE: Route output to segmented daemon logs directory ===
+        project_name = self.root_path.name
+        
+        # Dynamically resolve the backend/logs/ directory regardless of where the script is run
+        backend_dir = Path(__file__).resolve().parent.parent.parent
+        logs_dir = backend_dir / "logs" / project_name
+        
+        # Ensure the segmented directory exists (e.g., logs/nexusrisk/)
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        
+        output_file = logs_dir / "llm_context_dump.md"
         output_file.write_text(full_markdown, encoding="utf-8")
+        # ==================================================================
         
         return output_file

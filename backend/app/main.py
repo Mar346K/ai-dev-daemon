@@ -8,6 +8,7 @@ import asyncio  # <-- ADDED FOR DEBOUNCER
 
 from app.core.context_builder import ContextCompiler
 from app.core.telemetry import daemon_logger, get_project_logger
+import app.core.telemetry as telemetry
 from app.core.git_manager import GitManager
 from app.core.security import secure_resolve_path
 
@@ -43,6 +44,13 @@ class CrashLogRequest(BaseModel):
 @app.get("/health", status_code=status.HTTP_200_OK)
 async def health_check() -> JSONResponse:
     return JSONResponse(content={"status": "healthy", "service": "ai_dev_daemon"})
+
+@app.get("/metrics", status_code=status.HTTP_200_OK)
+async def get_metrics() -> JSONResponse:
+    """Provides real-time security and operational metrics to the UI."""
+    return JSONResponse(content={
+        "security_intercept_count": telemetry.SECURITY_INTERCEPT_COUNT
+    })
 
 @app.post("/compile-context", status_code=status.HTTP_200_OK)
 async def compile_context(request: ProjectRequest) -> JSONResponse:

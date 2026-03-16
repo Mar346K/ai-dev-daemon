@@ -331,15 +331,22 @@ class AIDevDashboard(QMainWindow):
         self.log_viewer.append(f"[SUCCESS] {message}")
         self._transition_state(UIState.IDLE)
         
-        # === V2 UPGRADE: Auto-load compiled markdown into the Audit Tab ===
+        # === V2 UPGRADE: Auto-load compiled markdown from the isolated daemon logs ===
         try:
-            target_dir = Path(self.txt_project_path.text())
-            dump_file = target_dir / "llm_context_dump.md"
+            project_name = Path(self.txt_project_path.text()).name
+            
+            # Dynamically resolve the path to backend/logs/{project_name}/llm_context_dump.md
+            daemon_root = Path(__file__).resolve().parent.parent
+            dump_file = daemon_root / "backend" / "logs" / project_name / "llm_context_dump.md"
+            
             if dump_file.exists():
                 content = dump_file.read_text(encoding="utf-8")
                 self.context_viewer.setPlainText(content)
                 self.lbl_last_audit.setText(f"Last Audit Event: Context Compiled @ {datetime.now().strftime('%H:%M:%S')}")
-                self.log_viewer.append(">>> Context loaded into Context & Audit Tab.")
+                self.log_viewer.append(f">>> Context successfully loaded from secure logs: {project_name}")
+            else:
+                self.log_viewer.append(f"[WARNING] Context compiled, but could not locate file at: {dump_file}")
+                
         except Exception as e:
             self.log_viewer.append(f"[ERROR] Could not load context into viewer: {e}")
 

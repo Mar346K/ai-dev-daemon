@@ -9,26 +9,24 @@ from datetime import datetime, timezone
 from pathlib import Path
 from enum import Enum, auto
 
-from PySide6.QtGui import QCloseEvent
+# === V2 UPGRADE: Added QTabWidget and QClipboard ===
+from PySide6.QtGui import QCloseEvent, QClipboard
 from PySide6.QtCore import QTimer, Qt, QThread, Signal, Slot, QUrl, QByteArray
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QTextBrowser, QFrame, QFileDialog, QLineEdit
+    QLabel, QPushButton, QTextBrowser, QFrame, QFileDialog, QLineEdit, QTabWidget
 )
+# ===================================================
 
-# Professional Standard: Decouple PySide6 rendering from the GPU.
-# This makes the UI immune to driver resets when Ollama spikes the VRAM.
 os.environ["QT_OPENGL"] = "software"
 os.environ["QT_QUICK_BACKEND"] = "software"
 
-# === UPGRADE 3.2: Deterministic UI State Machine ===
 class UIState(Enum):
     IDLE = auto()
     BUSY_COMPILING = auto()
     BUSY_COMMITTING = auto()
     BUSY_RUNNING = auto()
-# ===================================================
 
 class ProjectRunnerWorker(QThread):
     log_signal = Signal(str)
@@ -50,7 +48,6 @@ class ProjectRunnerWorker(QThread):
                 self.log_signal.emit(f"⚠️ [CRITICAL] Execution Aborted: File not found at {script_path}")
                 return
 
-            # Prepare standard arguments
             kwargs = {
                 "stdout": subprocess.PIPE,
                 "stderr": subprocess.STDOUT, 
@@ -59,10 +56,8 @@ class ProjectRunnerWorker(QThread):
                 "cwd": str(script_path.parent) 
             }
 
-            # === UPGRADE 1.4: OS-Level Subprocess Zombie Prevention ===
             if sys.platform == "win32":
                 kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
-            # ==========================================================
 
             process = subprocess.Popen(
                 [sys.executable, "-u", str(script_path)],
@@ -80,8 +75,6 @@ class ProjectRunnerWorker(QThread):
                 if not line:
                     continue
                 
-                # === REFINEMENT: Only tag as CRITICAL if it's NOT JSON ===
-                # If it's JSON, the UI will handle it natively.
                 if not line.startswith("{") and self.error_pattern.search(line):
                     current_time = time.time()
                     if line == self.last_error_msg and (current_time - self.last_error_time) < 2.0:
@@ -90,7 +83,6 @@ class ProjectRunnerWorker(QThread):
                     self.last_error_time = current_time
                     self.log_signal.emit(f"⚠️ [CRITICAL] {line}")
                 else:
-                    # Pass raw line (JSON or standard output) to the UI
                     self.log_signal.emit(line)
             
         except Exception as e:
@@ -101,26 +93,18 @@ class AIDevDashboard(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("AI Dev Daemon - Control Center")
-        self.resize(900, 600)
+        self.resize(1000, 700)
         
         self.session_start_time = datetime.now(timezone.utc)
         self.api_url = "http://localhost:8000"
-        
         self.current_state = UIState.IDLE
-        
-        # === UPGRADE 3.3: Native QNetworkAccessManager ===
-        # Replaces heavy QThreads with native Qt event loop async networking
         self.network_manager = QNetworkAccessManager(self)
-        # =================================================
-        
         self.project_worker = None
 
         self._init_ui()
         self._init_timers()
 
-    # === UPGRADE 3.2: Centralized State Mutator ===
     def _transition_state(self, new_state: UIState) -> None:
-        """Single source of truth for UI mutability to prevent race conditions."""
         self.current_state = new_state
         is_idle = (new_state == UIState.IDLE)
         
@@ -128,14 +112,16 @@ class AIDevDashboard(QMainWindow):
         self.btn_run_project.setEnabled(is_idle)
         self.btn_manual_commit.setEnabled(is_idle)
         self.btn_browse.setEnabled(is_idle)
-    # ==============================================
 
     def _init_ui(self) -> None:
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        main_layout = QVBoxLayout(central_widget)
+        # === V2 UPGRADE: QTabWidget Foundation ===
+        self.tabs = QTabWidget()
+        self.setCentralWidget(self.tabs)
+        
+        # --- TAB 1: Operator Console ---
+        self.tab_console = QWidget()
+        console_layout = QVBoxLayout(self.tab_console)
 
-        # Top Bar: Health and Uptime
         top_bar = QHBoxLayout()
         self.lbl_status = QLabel("Backend Status: 🔴 OFFLINE")
         self.lbl_status.setStyleSheet("font-weight: bold; font-size: 14px;")
@@ -145,14 +131,13 @@ class AIDevDashboard(QMainWindow):
         
         top_bar.addWidget(self.lbl_status)
         top_bar.addWidget(self.lbl_timer)
-        main_layout.addLayout(top_bar)
+        console_layout.addLayout(top_bar)
 
         line1 = QFrame()
         line1.setFrameShape(QFrame.Shape.HLine)
         line1.setFrameShadow(QFrame.Shadow.Sunken)
-        main_layout.addWidget(line1)
+        console_layout.addWidget(line1)
 
-        # Dynamic Project Selector
         project_bar = QHBoxLayout()
         self.lbl_project = QLabel("Target Project:")
         self.lbl_project.setStyleSheet("font-weight: bold;")
@@ -166,52 +151,72 @@ class AIDevDashboard(QMainWindow):
         project_bar.addWidget(self.lbl_project)
         project_bar.addWidget(self.txt_project_path)
         project_bar.addWidget(self.btn_browse)
-        main_layout.addLayout(project_bar)
+        console_layout.addLayout(project_bar)
 
         line2 = QFrame()
         line2.setFrameShape(QFrame.Shape.HLine)
         line2.setFrameShadow(QFrame.Shadow.Sunken)
-        main_layout.addWidget(line2)
+        console_layout.addWidget(line2)
 
-        # Logs Viewer
         self.log_viewer = QTextBrowser()
         self.log_viewer.setStyleSheet("background-color: #1e1e1e; color: #d4d4d4; font-family: monospace;")
-        
-        # === UPGRADE 1.1: Strict Ring-Buffer Memory Limit ===
         self.log_viewer.document().setMaximumBlockCount(1000)
-        # ====================================================
-        
         self.log_viewer.append(">>> UI Initialized. Awaiting backend connection...")
-        main_layout.addWidget(self.log_viewer)
+        console_layout.addWidget(self.log_viewer)
 
-       # Action Buttons
         bottom_bar = QHBoxLayout()
         self.btn_compile_context = QPushButton("Compile Context (Markdown)")
         self.btn_run_project = QPushButton("Run Active Project (Track Logs)")
         self.btn_manual_commit = QPushButton("Force Manual Commit")
-        
-        # --- Add this new button ---
         self.btn_clear_logs = QPushButton("Clear Logs")
-        self.btn_clear_logs.clicked.connect(self.log_viewer.clear)
-        # ---------------------------
         
         for btn in [self.btn_compile_context, self.btn_run_project, self.btn_manual_commit, self.btn_clear_logs]:
             btn.setMinimumHeight(40)
             bottom_bar.addWidget(btn)
             
-        main_layout.addLayout(bottom_bar)
+        console_layout.addLayout(bottom_bar)
         
+        # --- TAB 2: Context & Audit ---
+        self.tab_audit = QWidget()
+        audit_layout = QVBoxLayout(self.tab_audit)
+        
+        metrics_bar = QHBoxLayout()
+        self.lbl_secrets_masked = QLabel("Secrets Masked This Session: 0")
+        self.lbl_secrets_masked.setStyleSheet("color: #ff5555; font-weight: bold; font-size: 14px;")
+        
+        self.lbl_last_audit = QLabel("Last Audit Event: N/A")
+        self.lbl_last_audit.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.lbl_last_audit.setStyleSheet("color: #8be9fd; font-weight: bold; font-size: 14px;")
+        
+        metrics_bar.addWidget(self.lbl_secrets_masked)
+        metrics_bar.addWidget(self.lbl_last_audit)
+        audit_layout.addLayout(metrics_bar)
+        
+        self.context_viewer = QTextBrowser()
+        self.context_viewer.setStyleSheet("background-color: #282a36; color: #f8f8f2; font-family: monospace;")
+        self.context_viewer.setPlaceholderText("Compiled project context will appear here...")
+        audit_layout.addWidget(self.context_viewer)
+        
+        self.btn_copy_context = QPushButton("📋 Copy Context to Clipboard")
+        self.btn_copy_context.setMinimumHeight(40)
+        self.btn_copy_context.setStyleSheet("font-weight: bold;")
+        audit_layout.addWidget(self.btn_copy_context)
+        
+        # Add tabs to UI
+        self.tabs.addTab(self.tab_console, "💻 Operator Console")
+        self.tabs.addTab(self.tab_audit, "🛡️ Context & Audit")
+
         # UI Event Wiring
         self.btn_browse.clicked.connect(self._browse_project_directory)
         self.btn_compile_context.clicked.connect(self._trigger_context_compile)
         self.btn_run_project.clicked.connect(self._trigger_project_runner)
         self.btn_manual_commit.clicked.connect(self._trigger_manual_commit)
+        self.btn_clear_logs.clicked.connect(self.log_viewer.clear)
+        self.btn_copy_context.clicked.connect(self._copy_context_to_clipboard)
 
-        # === UPGRADE 2.2: Cryptographic Air-Gap Indicator ===
         self.status_bar = self.statusBar()
         self.status_bar.setStyleSheet("color: #50fa7b; font-family: monospace; font-weight: bold;")
         self.status_bar.showMessage("🔒 Air-Gap: Awaiting Sync...")
-        # ====================================================
 
     def _browse_project_directory(self) -> None:
         folder = QFileDialog.getExistingDirectory(self, "Select Target Project Directory")
@@ -237,9 +242,7 @@ class AIDevDashboard(QMainWindow):
         minutes, seconds = divmod(remainder, 60)
         self.lbl_timer.setText(f"Active Session: {hours:02d}:{minutes:02d}:{seconds:02d}")
 
-    # --- NEW NETWORKING HELPER ---
     def _create_secure_request(self, endpoint: str) -> QNetworkRequest:
-        """Constructs a QNetworkRequest with the required IPC Bearer token."""
         req = QNetworkRequest(QUrl(f"{self.api_url}{endpoint}"))
         req.setHeader(QNetworkRequest.KnownHeaders.ContentTypeHeader, "application/json")
         
@@ -249,11 +252,16 @@ class AIDevDashboard(QMainWindow):
         
         return req
 
-    # --- REWRITTEN API METHODS ---
     def _ping_backend(self) -> None:
-        req = self._create_secure_request("/health")
-        reply = self.network_manager.get(req)
-        reply.finished.connect(lambda r=reply: self._on_health_reply(r))
+        # Ping Health
+        req_health = self._create_secure_request("/health")
+        reply_health = self.network_manager.get(req_health)
+        reply_health.finished.connect(lambda r=reply_health: self._on_health_reply(r))
+        
+        # === V2 UPGRADE: Poll Metrics ===
+        req_metrics = self._create_secure_request("/metrics")
+        reply_metrics = self.network_manager.get(req_metrics)
+        reply_metrics.finished.connect(lambda r=reply_metrics: self._on_metrics_reply(r))
 
     def _on_health_reply(self, reply: QNetworkReply) -> None:
         try:
@@ -263,7 +271,18 @@ class AIDevDashboard(QMainWindow):
             else:
                 self._on_health_error(reply.errorString())
         finally:
-            reply.deleteLater() # Critical for C++ memory management
+            reply.deleteLater()
+
+    def _on_metrics_reply(self, reply: QNetworkReply) -> None:
+        try:
+            if reply.error() == QNetworkReply.NetworkError.NoError:
+                data = json.loads(reply.readAll().data().decode())
+                count = data.get("security_intercept_count", 0)
+                self.lbl_secrets_masked.setText(f"Secrets Masked This Session: {count}")
+        except Exception:
+            pass
+        finally:
+            reply.deleteLater()
 
     @Slot(bool, str)
     def _on_health_success(self, status: bool, message: str) -> None:
@@ -311,11 +330,28 @@ class AIDevDashboard(QMainWindow):
     def _on_compile_success(self, status: bool, message: str) -> None:
         self.log_viewer.append(f"[SUCCESS] {message}")
         self._transition_state(UIState.IDLE)
+        
+        # === V2 UPGRADE: Auto-load compiled markdown into the Audit Tab ===
+        try:
+            target_dir = Path(self.txt_project_path.text())
+            dump_file = target_dir / "llm_context_dump.md"
+            if dump_file.exists():
+                content = dump_file.read_text(encoding="utf-8")
+                self.context_viewer.setPlainText(content)
+                self.lbl_last_audit.setText(f"Last Audit Event: Context Compiled @ {datetime.now().strftime('%H:%M:%S')}")
+                self.log_viewer.append(">>> Context loaded into Context & Audit Tab.")
+        except Exception as e:
+            self.log_viewer.append(f"[ERROR] Could not load context into viewer: {e}")
 
     @Slot(str)
     def _on_compile_error(self, error_msg: str) -> None:
         self.log_viewer.append(f"[ERROR] Context compilation failed: {error_msg}")
         self._transition_state(UIState.IDLE)
+
+    def _copy_context_to_clipboard(self) -> None:
+        clipboard = QApplication.clipboard()
+        clipboard.setText(self.context_viewer.toPlainText())
+        self.lbl_last_audit.setText(f"Last Audit Event: Copied to Clipboard @ {datetime.now().strftime('%H:%M:%S')}")
 
     def _trigger_project_runner(self) -> None:
         if self.current_state != UIState.IDLE:
@@ -358,7 +394,6 @@ class AIDevDashboard(QMainWindow):
             html = f"<span style='color:{color}'>[{timestamp}] {level.upper()}: {event}</span>"
             self.log_viewer.append(html)
             
-            # Fire-and-forget native async crash routing
             if level in ["error", "critical"]:
                 project_name = Path(self.txt_project_path.text()).name
                 payload = json.dumps({"project_name": project_name, "log_message": log_entry}).encode("utf-8")
@@ -369,7 +404,6 @@ class AIDevDashboard(QMainWindow):
         except json.JSONDecodeError:
             self.log_viewer.append(log_entry)
             
-            # Fire-and-forget native async crash routing
             if "⚠️ [CRITICAL]" in log_entry:
                 project_name = Path(self.txt_project_path.text()).name
                 payload = json.dumps({"project_name": project_name, "log_message": log_entry}).encode("utf-8")
@@ -411,6 +445,7 @@ class AIDevDashboard(QMainWindow):
     def _on_commit_success(self, status: bool, message: str) -> None:
         self.log_viewer.append(f"[SUCCESS] {message}")
         self._transition_state(UIState.IDLE)
+        self.lbl_last_audit.setText(f"Last Audit Event: Manual Commit @ {datetime.now().strftime('%H:%M:%S')}")
         
     @Slot(str)
     def _on_commit_error(self, error_msg: str) -> None:
@@ -418,11 +453,6 @@ class AIDevDashboard(QMainWindow):
         self._transition_state(UIState.IDLE)
 
     def closeEvent(self, event: QCloseEvent) -> None:
-        """
-        Intercepts the window close event to ensure deterministic teardown
-        of all C++ QThread objects before the Python interpreter exits.
-        """
-        # We only have one QThread left to manage!
         workers = [self.project_worker]
 
         for worker in workers:
@@ -434,7 +464,6 @@ class AIDevDashboard(QMainWindow):
 
         self.log_viewer.append(">>> Safe shutdown complete.")
         event.accept()
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
